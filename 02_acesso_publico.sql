@@ -1,4 +1,4 @@
--- Consulta livre do painel. Notas e destaques continuam só da supervisão.
+-- Consulta livre do painel. Notas, destaques e a playlist ficam só com a supervisão.
 -- A equipe logada altera as outras áreas. Gestão (estudos, domingos, trocas, notas) fica com a supervisão.
 
 grant select on table public.docs to anon;
@@ -29,7 +29,7 @@ create policy docs_insert on public.docs for insert to authenticated
   with check (
     public.is_sup()
     or ( public.is_member() and public.team_writable(path) )
-    or ( public.is_member() and path = 'config' and id in ('p-' || auth.uid()::text, 'home') )
+    or ( public.is_member() and path = 'config' and id = 'p-' || auth.uid()::text )
   );
 
 drop policy if exists docs_update on public.docs;
@@ -37,12 +37,12 @@ create policy docs_update on public.docs for update to authenticated
   using (
     public.is_sup()
     or ( public.is_member() and public.team_writable(path) )
-    or ( public.is_member() and path = 'config' and id in ('p-' || auth.uid()::text, 'home') )
+    or ( public.is_member() and path = 'config' and id = 'p-' || auth.uid()::text )
   )
   with check (
     public.is_sup()
     or ( public.is_member() and public.team_writable(path) )
-    or ( public.is_member() and path = 'config' and id in ('p-' || auth.uid()::text, 'home') )
+    or ( public.is_member() and path = 'config' and id = 'p-' || auth.uid()::text )
   );
 
 drop policy if exists docs_delete on public.docs;
