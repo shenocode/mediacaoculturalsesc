@@ -115,6 +115,11 @@ main{padding:12px}.card{padding:12px}
 .jph .jtt{font-size:18px;line-height:1.25;-webkit-line-clamp:5}
 .jcap{font-size:16px}
 @media(max-width:700px){.jph .jtt{font-size:15px}.jcap{font-size:14px}}
+.jph.odt{background:var(--yel);color:var(--navy);justify-content:center;align-items:center;gap:2px;padding:8px 6px}
+.jph.odt b{font-family:Bevan,serif;font-weight:400;font-size:clamp(26px,5vw,40px);line-height:.95;letter-spacing:.01em}
+.jph.odt span{font-family:Nunito,sans-serif;font-weight:800;font-size:14px;line-height:1.1}
+.mi .jph.odt{width:min(100%,440px)}
+@media(max-width:700px){.jph.odt b{font-size:22px}.jph.odt span{font-size:12px}}
 
 .jbar{flex-wrap:wrap}.jc{display:flex;flex-direction:column}.jc>a{flex:1}.jbar{margin-top:auto}
 @media(max-width:700px){.jbar{justify-content:center;gap:4px}.jbar .mvb button{min-width:24px;height:24px;padding:0 6px}.jbar .x{width:24px;height:24px}}
@@ -953,14 +958,16 @@ const IFF=i=>papelOf(i)=='participar'?IFP:IFA;
 let IO=null,IE=0;const APR=i=>['Aprovada','Em piloto'].includes(i.status);
 const oform=(papel,id,fields,sum,btn)=>`<details><summary>${sum}</summary><form id="${id}" data-papel="${papel}">${fields.map(fld).join('')}<label>Imagem de capa<input type=file name=capa accept="image/*"></label><button class=btn>${btn}</button></form></details>`;
 const IPAN=()=>`<section class=card><h3>Oficinas para aplicar</h3><p class=d>A equipe é educadora e aplica a oficina ao público. Depois de enviada, ela aparece como um cartão. Enquanto não for aprovada, você pode editar.</p>${oform('aplicar','idf-apl',IFA,'➕ Propor oficina para aplicar','Enviar proposta')}<div id=l-apl></div></section><section class=card><h3>Oficinas para participar</h3><p class=d>A equipe participa. Quem ministra é o educador ou a educadora da oficina. Com data e horário, ela entra no calendário.</p>${oform('participar','idf-part',IFP,'➕ Nova oficina para participar','Salvar oficina')}<div id=l-part></div></section>`;
-function drawI(){const card=i=>`<button class="jc ic" data-io="${i.id}"><div class=jt>${i.capa?`<img loading=lazy src="${esc(safe(i.capa))}" alt="">`:'<div class=jph style="background:var(--yel)">💡</div>'}</div><div class=jn>${esc(i.titulo)}</div><div class=jp>${esc(i.autor)}</div></button>`;
-const a=[...(S.ideias||[])].filter(i=>(!FS||(i.status||'Nova')==FS)&&(!FM||i.uid==MY)).sort((x,y)=>y.ts-x.ts);
+function ofNear(a,b){const da=dtOf(a)||'9999',db=dtOf(b)||'9999',t=ymd(new Date()),pa=da.slice(0,10)<t,pb=db.slice(0,10)<t;if(pa!=pb)return pa?1:-1;return da.localeCompare(db)||String(a.titulo||'').localeCompare(String(b.titulo||''),'pt')}
+function ofFace(i){const d=dtOf(i),dia=d?fd(d.slice(0,10)):'',h=ofR(i);return `<div class="jph odt"><b>${esc(dia||'—')}</b>${h?`<span>${esc(h)}</span>`:''}</div>`}
+function drawI(){const card=i=>`<button class="jc ic" data-io="${i.id}"><div class=jt>${i.capa?`<img loading=lazy src="${esc(safe(i.capa))}" alt="">`:papelOf(i)=='participar'?ofFace(i):'<div class=jph style="background:var(--yel)">💡</div>'}</div><div class=jn>${esc(i.titulo)}</div><div class=jp>${esc(i.autor)}</div></button>`;
+const a=[...(S.ideias||[])].filter(i=>(!FS||(i.status||'Nova')==FS)&&(!FM||i.uid==MY));
 const put=(id,list,vazio)=>{const el=$(id);if(el)el.innerHTML=list.length?`<div class=jg>${list.map(card).join('')}</div>`:`<p class=mut>${vazio}</p>`};
-put('#l-part',a.filter(i=>papelOf(i)=='participar'),'Nenhuma oficina para participar.');
-put('#l-apl',a.filter(i=>papelOf(i)=='aplicar'),'Nenhuma oficina para aplicar.');
+put('#l-part',a.filter(i=>papelOf(i)=='participar').sort(ofNear),'Nenhuma oficina para participar.');
+put('#l-apl',a.filter(i=>papelOf(i)=='aplicar').sort((x,y)=>y.ts-x.ts),'Nenhuma oficina para aplicar.');
 if(IO!=null)imodal()}
 function imodal(){let m=$('#im');if(IO==null){m&&m.remove();return}const i=(S.ideias||[]).find(x=>x.id==IO);if(!i){if(!Array.isArray(S.ideias))return;IO=null;m&&m.remove();return}if(!m){m=document.createElement('div');m.id='im';document.body.append(m)}if(m.dataset.id==IO&&(IE||typing(m)))return;m.dataset.id=IO;
-const can=isEd||(i.uid&&i.uid==MY&&!APR(i)),row=(l,v)=>v?`<p><b>${l}:</b> ${esc(v)}</p>`:'',img=i.capa?`<img src="${esc(safe(i.capa))}" alt="">`:'<span class=mut>sem imagem de capa</span>';
+const can=isEd||(i.uid&&i.uid==MY&&!APR(i)),row=(l,v)=>v?`<p><b>${l}:</b> ${esc(v)}</p>`:'',img=i.capa?`<img src="${esc(safe(i.capa))}" alt="">`:papelOf(i)=='participar'?ofFace(i):'<span class=mut>sem imagem de capa</span>';
 const part=papelOf(i)=='participar',fields=IFF(i),quando=[dtOf(i)?fd(dtOf(i).slice(0,10)):'',ofR(i)?ofR(i)+(ofT(i).b?'':''):''].filter(Boolean).join(' · ');
 const papelSel=`<label>Esta oficina é<select name=papel><option value=participar ${part?'selected':''}>Para participar (a equipe participa)</option><option value=aplicar ${part?'':'selected'}>Para aplicar (a equipe é educadora)</option></select></label>`;
 const body=IE?`<form id=ief><h3>Editar oficina</h3>${papelSel}${fields.map(f=>fldv(f,f[0]=='med'?i.mediador:f[0]=='fim'?ofT(i).b:i[f[0]])).join('')}<label>Nova imagem de capa (opcional)<input type=file name=capa accept="image/*"></label><button class=btn>Salvar alterações</button> <button type=button class="btn g" data-ie="0">Cancelar</button></form>`:
