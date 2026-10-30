@@ -184,6 +184,8 @@ main{padding:12px}.card{padding:12px}
 .cfi{flex:1;min-height:60px;overflow:auto;padding:18px 18px 8px;display:flex;flex-direction:column;gap:8px}.cfi small{font:800 11px Nunito,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--red)}.cq{font:400 1.45rem/1.3 Bevan,Georgia,serif;color:var(--navy);margin:auto 0;white-space:pre-wrap;text-align:center}.ca{margin:0;font-size:1.02rem;line-height:1.4;white-space:pre-wrap}.cau{color:var(--mut)!important;text-transform:none!important;letter-spacing:0!important;font-weight:600!important;margin-top:auto}.cimw{flex:none;padding:8px 12px 0}.zoomi{position:fixed;inset:0;z-index:9999;background:rgba(10,10,30,.92);display:flex;align-items:center;justify-content:center;padding:12px}.zoomi img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}.zoomi button{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:3px solid var(--navy);background:var(--yel);font:800 20px Nunito,sans-serif;color:var(--navy)}.cim{cursor:zoom-in;display:block;width:100%;max-height:34vh;object-fit:contain;border:2px solid var(--navy);border-radius:8px;background:#fff}.crv{background:var(--red,#c8301f);color:#fff;border:3px solid var(--navy);border-radius:12px;padding:10px 22px;font:800 16px Nunito,sans-serif;box-shadow:0 3px 0 var(--navy);cursor:pointer}.cfh{text-align:center;font:700 12px Nunito,sans-serif;color:var(--mut);padding:6px 0 10px}
 .cbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.cbar .btn{margin:0}.cbar .btn[disabled]{opacity:.4}
 .cobs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px}.cob{flex:1 0 42%;scroll-snap-align:start;min-width:120px;max-width:none;background:#fff;border:2px solid var(--navy);border-radius:8px;padding:3px;cursor:pointer;display:flex;flex-direction:column;gap:2px;font:inherit}.cob img{width:100%;aspect-ratio:4/5;object-fit:contain;background:#f3efe2;border-radius:5px;display:block}.cob small{font:700 11px/1.2 Nunito,sans-serif;color:var(--navy);text-align:center}.cobh{display:block;text-align:center;font:600 11px Nunito,sans-serif;color:var(--mut);margin-top:3px}#md[data-top='1'] .mb{z-index:50}.obp{display:flex;flex-direction:column;gap:6px;margin:8px 0;grid-column:1/-1}.obp input{width:100%}.obl{max-height:170px;overflow:auto;border:2px solid var(--navy);border-radius:8px;padding:4px 8px;background:#fff}.obl label{font:600 13px Nunito,sans-serif;color:var(--ink);padding:3px 0}.obl label{display:flex!important;flex-direction:row!important;align-items:center;gap:10px;width:100%;margin:0;border-bottom:1px solid #eee}.obl label input{width:22px!important;height:22px;flex:0 0 22px;margin:0;padding:0}.obl label span{}.obl{display:grid!important;grid-template-columns:repeat(3,1fr);gap:8px;max-height:min(58vh,460px);padding:8px!important}.obl label{display:block!important;position:relative;border:0!important;padding:0!important;cursor:pointer}.obl label input{position:absolute;opacity:0;width:1px!important;height:1px!important;flex:none}.obl label[hidden]{display:none!important}.obt{position:relative;border:3px solid #d8d2bd;border-radius:10px;overflow:hidden;background:#f3efe2}.obt img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover}.obt i{display:flex;align-items:center;justify-content:center;aspect-ratio:4/5;font:600 11px Nunito,sans-serif;color:#888}.obt span{display:block;font:700 11px/1.2 Nunito,sans-serif;color:var(--navy);padding:4px 5px;text-align:left}.obt em{display:none;position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:var(--red,#c8301f);color:#fff;font:800 16px/26px Nunito,sans-serif;text-align:center;font-style:normal}.obl input:checked~.obt{border-color:var(--red,#c8301f);box-shadow:0 0 0 2px var(--red,#c8301f)}.obl input:checked~.obt em{display:block}
+body.sogal nav,body.sogal #wa,body.sogal #authbtn{display:none!important}body.sogal [data-hhome]{cursor:default}
+.ghd{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;margin:0 0 6px;flex-wrap:wrap}.ghd h3{margin:0}.ghd .btn{margin:0;align-self:center;padding:8px 12px}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="supabase-shim.js"></script>
@@ -204,6 +206,8 @@ if(c=='unavailable')return b+': instabilidade momentânea, tente de novo.';
 if(c=='revoked'||c=='not_granted')return b+': acesso retirado ou não concedido. Peça acesso de Colaborador à supervisão.';
 return b+(c||m?' ('+(c?c+(m?' – ':''):'')+m+')':'')};
 let db,user,assets,isEd=false,MEMBER=false;const S={};
+const SOGAL=new URLSearchParams(location.search).has('galeria');
+if(SOGAL){document.body.classList.add('sogal');document.title='Galeria · Letras & Filetes';const h1=document.querySelector('.hd h1');if(h1)h1.textContent='Galeria';const sub=document.querySelector('.hd .mut');if(sub)sub.textContent='Letras & Filetes · Sesc Piracicaba';document.querySelectorAll('[data-hhome]').forEach(el=>{el.removeAttribute('role');el.removeAttribute('tabindex');el.removeAttribute('title')})}
 const FX=[['Segunda','seg'],['Terça','ter'],['Quarta','qua'],['Quinta','qui'],['Sexta','sex'],['Sábado','sab'],['Domingo','dom']];
 const CFG={
 equipe:{t:'Equipe e horário fixo semanal',d:'Cadastre cada pessoa já com o turno fixo de segunda a domingo (deixe em branco o dia de folga). O quadro "Domingos" serve só para o revezamento de quem não tem domingo fixo.',ed:1,f:[['nome','Nome','text'],['nick','Nick (como será chamado/a)','text'],['funcao','Função','select',['Estagiário/a','Facilitadora artística','Convidado/a','Supervisão','Coordenação','Gestão']],['bio','Mini bio (aparece ao clicar na foto)','textarea'],['interesses','Áreas de interesse / o que quero aprender','text'],['email','E-mail','text'],['whats','WhatsApp (com DDD, só números)','text'],['nasc','Aniversário','date'],['foto','Foto (opcional)','img'],...FX.map(([l,k])=>[k,l+' (turno, ex.: 9h–17h)','text'])],r:i=>`<div class=erow>${AV(i,'sm')}<div><b>${esc(i.nome)}</b>${i.nick?` <span class=mut>“${esc(i.nick)}”</span>`:''} <span class=tag>${esc(i.funcao)}</span><div class=mut>${FX.map(([l,k])=>i[k]?l.slice(0,3)+' '+esc(i[k]):'').filter(Boolean).join(' · ')||'sem horário fixo cadastrado'}</div>${isEd?`<button type=button class="btn g" data-em="${i.id}" style="padding:4px 12px;margin:6px 0 0">✏️ Editar</button>`:''}${isEd&&MY?AN(i):''}</div></div>`},
@@ -237,7 +241,7 @@ const GESTAO=new Set(['estudos','notas','domingos','trocas','escala']);
 const canArea=c=>GESTAO.has(c)?!!isEd:!!MEMBER;
 function panel(c){const g=CFG[c];const can=!g.ed||canArea(c);
 return `<section class="card"><h3>${g.t}</h3><p class=d>${g.d}</p>${can?(c=='obras'?'<details><summary>➕ Cadastrar nova obra</summary>':'')+`<details class=nf ${MOB()&&c!='conteudo'?'':'open'}><summary>➕ Adicionar novo</summary><form data-c="${c}">${g.f.map(fld).join('')}<button class=btn>Adicionar</button></form></details>`+(c=='obras'?'</details>':''):(MEMBER?'<p class=d>🔒 Somente a supervisão adiciona itens aqui.</p>':'<p class=d>🔒 <button type=button class="btn g" data-login=1>Entrar</button> para alterar.</p>')}<div id="l-${c}"></div></section>`}
-function show(t){BK=null;bkM();if(!TABS[t])t=isEd?'painel':'home';if(!isEd&&['painel','escala','estudos','notas'].includes(t))t='home';OPEN=null;modal();IO=null;IE=0;imodal();CADK=null;if(t!='caderno'){PREV='';PRED=''}CUR=t;try{ROOM&&ROOM.presence({tab:t})}catch(e){}NP=GR.sup.items.some(i=>i[0]==t)&&isEd?'sup':null;navR();location.hash=t;
+function show(t){if(SOGAL)t='galeria';BK=null;bkM();if(!TABS[t])t=isEd?'painel':'home';if(!isEd&&['painel','escala','estudos','notas'].includes(t))t='home';if(SOGAL)t='galeria';OPEN=null;modal();IO=null;IE=0;imodal();CADK=null;if(t!='caderno'){PREV='';PRED=''}CUR=t;try{ROOM&&ROOM.presence({tab:t})}catch(e){}NP=GR.sup.items.some(i=>i[0]==t)&&isEd?'sup':null;navR();if(SOGAL){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}else location.hash=t;
 $('#main').innerHTML=t=='home'?'<div id=home></div>':t=='painel'?'<div id="dash"></div>':t=='calendario'?'<div id="cal"></div>':t=='time'?'<div id=team></div>':t=='ideias'?`<div class="card"><div class=calbar style="margin:0"><label>Filtrar por status<select id=fs><option value="">Todos</option>${['Nova','Em análise','Aprovada','Em piloto','Arquivada'].map(x=>`<option>${x}</option>`).join('')}</select></label><label class=chk><input type=checkbox id=fm> Só as minhas ideias</label>${isEd?'<button class="btn g" id=ex>Baixar planilha (CSV)</button>':''}</div></div>`+IPAN():t=='obras'?OBAR()+panel('obras'):t=='trilhas'?'<div id=trilhas></div>':t=='estudos'?panel('estudos')+'<div id="cal"></div>':t=='jornada'?JORN():t=='galeria'?GALH():t=='cartas'?'<div id=cartas></div>':t=='caderno'?CADH():t=='notas'?REP()+panel('notas'):TABS[t][1].map(panel).join('');
 TABS[t][1].forEach(draw);if(t=='home')drawH();if(t=='painel')dash();if(t=='calendario')cal();if(t=='caderno')drawCad();initMeds(document);if(t=='jornada')drawJ();if(t=='estudos')cal();if(t=='galeria')drawG();if(t=='cartas')drawC(true);if(t=='trilhas')drawTr();if(t=='time')drawT();people()}
 function people(){let d=$('#pessoas');if(!d){d=document.createElement('datalist');d.id='pessoas';document.body.append(d)}d.innerHTML=(S.equipe||[]).map(p=>`<option value="${esc(p.nick||p.nome)}" label="${esc(p.nome)}">`).join('')}
@@ -411,7 +415,7 @@ let AN1=0;
 let CUR='painel',NP=null;
 const GR={sup:{l:'Gestão',ed:1,items:[['escala','Escala e equipe'],['estudos','Agenda de estudos'],['notas','Notas e relatórios']]}};
 let NM=false;
-const navR=()=>{const g=NP&&GR[NP]&&(!GR[NP].ed||isEd)?NP:null;const GB=Object.entries(GR).filter(([k,v])=>!v.ed||isEd).map(([k,v])=>`<button data-g="${k}" class="${g==k?'on':''}">${v.l} ▾</button>`).join('');
+const navR=()=>{if(SOGAL){const n=$('#nav');if(n){n.innerHTML='';n.hidden=true}return}const g=NP&&GR[NP]&&(!GR[NP].ed||isEd)?NP:null;const GB=Object.entries(GR).filter(([k,v])=>!v.ed||isEd).map(([k,v])=>`<button data-g="${k}" class="${g==k?'on':''}">${v.l} ▾</button>`).join('');
 const items=[];TOP().forEach(([k,l])=>{items.push(`<button data-t="${k}" class="${CUR==k?'on':''}">${l}</button>`+(k=='painel'?GB:''));if(k=='painel')items[items.length-1]=items[items.length-1]});if(!TOP().some(([k])=>k=='painel'))items.push(GB);
 let h;{const all=TOP().flatMap(([k,l])=>k=='painel'?[['t',k,l],...Object.entries(GR).filter(([a,v])=>!v.ed||isEd).map(([a,v])=>['g',a,v.l+' ▾'])]:[['t',k,l]]);if(!TOP().some(([k])=>k=='painel'))Object.entries(GR).filter(([a,v])=>!v.ed||isEd).forEach(([a,v])=>all.push(['g',a,v.l+' ▾']));
 const on=([ty,k])=>ty=='g'?g==k:(CUR==k&&!g),btn=([ty,k,l])=>`<button ${ty=='g'?'data-g':'data-t'}="${k}" class="${on([ty,k])?'on':''}">${l}</button>`;
@@ -421,20 +425,186 @@ if(g)h+='<div class="nr sub">'+GR[g].items.map(([k,l])=>`<button data-t="${k}" d
 $('#nav').innerHTML=h};
 const ISO=n=>{const d=new Date();d.setDate(d.getDate()+n);return ymd(d)};
 const AN=i=>`<details style="margin-top:6px"><summary>📝 Anotações (só você vê)</summary><textarea data-an="${i.id}" rows=4 style="margin-top:6px" placeholder="Observações, combinados, pontos de desenvolvimento…">${esc((S.anot||{})[i.id]||'')}</textarea><button type=button class="btn g" data-dt2="1" style="margin-top:6px">+ data de hoje</button></details>`;
-const REP=()=>`<div class=card><h3>Relatório semanal para a gestão</h3><p class=d>Monta um resumo com os dados do painel (visitas, oficinas, ideias) e as suas notas do período. Revise, complete e copie para e-mail ou WhatsApp.</p><div class=calbar><label>De<input type=date id=rf value="${ISO(-6)}"></label><label>Até<input type=date id=rt value="${ISO(0)}"></label><button class=btn id=rg>Montar relatório</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar como nota</button></div><textarea id=ro rows=14 placeholder="O relatório aparece aqui. Este campo não salva sozinho: use “Salvar como nota” ou “Copiar texto”." style="margin-top:8px"></textarea></div>`;
+const relClip=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n-1)+'…':s};
+const relWhen=ts=>{if(ts==null||ts==='')return '';const d=new Date(typeof ts=='number'||/^\d+$/.test(String(ts))?+ts:ts);if(isNaN(+d))return '';return ymd(d)};
+const relIn=(ts,f,t)=>{const y=relWhen(ts);return !!y&&y>=f&&y<=t};
+const relAdded=(list,f,t)=>(list||[]).filter(x=>relIn(x.ts,f,t));
+const relUniq=a=>{const s=new Set();return a.filter(x=>{const k=String(x).toLowerCase();if(s.has(k))return false;s.add(k);return true})};
+const REL_TEMAS=[
+ ['Acolhimento e recepção',/recep|acolh|chegad|ônibus|onibus|atras|apresent|respons[aá]vel/i],
+ ['Obras e exposição',/obra|exposi|artista|t[eé]cnica|quadro|tela|filete|latinidade/i],
+ ['Participação do grupo',/particip|interesse|pergunt|convers|engaj|timid|agitad|turma|aluno/i],
+ ['Tempo e percurso',/tempo|hor[aá]rio|ritmo|dura[cç][aã]o|correu/i],
+ ['Acessibilidade',/acessib|pcd|defici|libras|cadeira|inclus|neuro/i],
+ ['Oficinas e atividades',/oficina|atividade|din[aâ]mica|jogo|ateli[eê]/i],
+ ['Materiais',/material|papel|l[aá]pis|caneta|tinta|cola|tesoura|giz|pincel|cartolina/i],
+ ['Cuidados e ocorrências',/ocorr|cuidado|quebra|toque|conflit|incidente|barulh|risco/i]
+];
+const REL_CATS=[
+ ['Materiais',/material|papel|l[aá]pis|caneta|tinta|cola|tesoura|giz|pincel|cartolina|tecido|folha|equipament|compr|estoque/i],
+ ['Espaço e infraestrutura',/sala|espa[cç]o|banheir|audit|cadeira|mesa|ar cond|limpez|ilumina/i],
+ ['Equipe e escala',/escala|folga|turno|cobertura|f[eé]rias|equipe|plant[aã]o|mediador/i],
+ ['Visitas e grupos',/visita|grupo|escola|agend|ônibus|onibus|turma/i],
+ ['Obras e exposição',/obra|exposi|artista|moldur|etiqueta|legend|acervo/i],
+ ['Tecnologia e mídia',/wifi|wi-fi|projetor|\bsom\b|\btv\b|comput|impress|\bqr\b|[aá]udio|v[ií]deo/i],
+ ['Acessibilidade',/acessib|cadeir|libras|pcd|defici[eê]n/i],
+ ['Comunicação',/cartaz|divulg|instagram|convite|story|rede social|whats/i]
+];
+function relBucket(rows,cats,textOf,fallback,showOf){
+ const map=new Map(cats.map(c=>[c[0],[]])),extra=new Map();
+ rows.forEach(row=>{
+  const tx=String(textOf(row)||'').trim();if(!tx)return;
+  const show=showOf?String(showOf(row)||'').trim():tx;if(!show)return;
+  const hit=cats.find(c=>c[1].test(tx));
+  const key=hit?hit[0]:(typeof fallback=='function'?fallback(row):fallback);
+  const dest=map.has(key)?map:extra;
+  if(!dest.has(key))dest.set(key,[]);
+  dest.get(key).push(show);
+ });
+ const out=[];
+ map.forEach((arr,k)=>{if(arr.length)out.push({title:k,items:relUniq(arr)})});
+ extra.forEach((arr,k)=>{if(arr.length)out.push({title:k,items:relUniq(arr)})});
+ return out;
+}
+function montarRelatorio(f,t){
+ const r=d=>d&&d>=f&&d<=t,today=ymd(new Date()),A=S.agendamentos||[],I=S.ideias||[],N=S.notas||[];
+ const ok=x=>x.status!='Cancelado',so=(x,y)=>((x.data||'')+(x.hora||'')).localeCompare((y.data||'')+(y.hora||''));
+ const ag=A.filter(x=>r(x.data)&&ok(x)).sort(so),re=ag.filter(x=>x.status=='Realizado'),cancel=A.filter(x=>r(x.data)&&x.status=='Cancelado');
+ const pessoas=list=>list.reduce((s,x)=>s+(+x.alunos||0),0),pe=pessoas(re),ainda=ag.filter(x=>x.status!='Realizado'),pePrev=pessoas(ainda);
+ const mats=relAdded(S.materiais,f,t),vids=relAdded(S.videos,f,t),extras=relAdded((S.extras||[]).filter(x=>!x.mural),f,t),estudos=relAdded(S.estudos,f,t);
+ const gal=(S.galeria||[]).filter(x=>relIn(x.ts,f,t)),fotos=gal.filter(x=>x.tipo!='video'),galVid=gal.filter(x=>x.tipo=='video');
+ const cartas=relAdded(S.cartas,f,t),obras=relAdded(S.obras,f,t),dest=relAdded(S.destaques,f,t).filter(x=>!String(x.oculto||'').startsWith('Oculto'));
+ const notasObra=(S.anotobras||[]).filter(x=>x.texto&&!x.fav&&relIn(x.ts,f,t));
+ const trocas=(S.trocas||[]).filter(x=>r(x.data)),doms=(S.domingos||[]).filter(x=>r(x.data)),ideiasNovas=I.filter(x=>relIn(x.ts,f,t));
+ const ofi=I.filter(x=>{const d=(dtOf(x)||'').slice(0,10);return d&&r(d)&&(x.status=='Aprovada'||x.status=='Em piloto')});
+ const limite=t<today?t:today;
+ const ofiFeitas=ofi.filter(x=>(dtOf(x)||'').slice(0,10)<=limite).sort((a,b)=>dtOf(a).localeCompare(dtOf(b)));
+ const ofiPrev=ofi.filter(x=>(dtOf(x)||'').slice(0,10)>limite).sort((a,b)=>dtOf(a).localeCompare(dtOf(b)));
+ const stats=[],add=(k,v,always)=>{if(always||v)stats.push({k,v:String(v)})};
+ add('Grupos agendados',ag.length,1);
+ add('Grupos realizados',re.length,1);
+ add('Pessoas atendidas',pe,1);
+ add('Pessoas previstas em grupos ainda não realizados',pePrev,1);
+ add('Grupos cancelados',cancel.length,0);
+ if(re.length)add('Média de pessoas por grupo realizado',Math.round((pe/re.length)*10)/10,1);
+ const comPos=ag.filter(x=>String(x.pos||'').trim());
+ add('Registros de pós-visita',comPos.length,1);
+ add('Visitas com informação de acessibilidade',ag.filter(x=>String(x.pcd||'').trim()).length,0);
+ add('Materiais de estudo incluídos',mats.length+vids.length+extras.length,1);
+ add('Materiais educativos',mats.length,0);
+ add('Vídeos de apoio',vids.length,0);
+ add('Materiais extras da jornada',extras.length,0);
+ add('Horários de estudo incluídos',estudos.length,0);
+ add('Fotos incluídas',fotos.length,1);
+ add('Vídeos de registro incluídos',galVid.length,0);
+ add('Obras cadastradas',obras.length,0);
+ add('Cartas novas',cartas.length,0);
+ add('Destaques publicados',dest.length,0);
+ add('Ideias de oficina recebidas',ideiasNovas.length,0);
+ add('Oficinas com data no período',ofi.length,0);
+ add('Notas de mediação nas obras',notasObra.length,0);
+ add('Folgas e coberturas',trocas.length,0);
+ add('Domingos de revezamento',doms.length,0);
+ const mural=(S.extras||[]).filter(x=>x.mural&&!x.done);
+ const notasAbertas=N.filter(x=>x.status!='Resolvida'&&['Pendência','Solicitação à gestão','Necessidade'].includes(x.tipo));
+ add('Itens do mural em aberto',mural.length,0);
+ add('Pendências da gestão em aberto',notasAbertas.length,0);
+ add('Pessoas na equipe (cadastro atual)',(S.equipe||[]).length,0);
+ const tally=(keyOf)=>{const m=new Map();ag.forEach(x=>{const k=keyOf(x);if(!k)return;const c=m.get(k)||{n:0,p:0};c.n++;c.p+=(+x.alunos||0);m.set(k,c)});return [...m.entries()].sort((a,b)=>b[1].n-a[1].n).map(([k,c])=>k+': '+c.n+' grupo'+(c.n>1?'s':'')+(c.p?' · '+c.p+' pessoas':''))};
+ const sections=[{title:'Panorama do período',intro:'Números reunidos dos registros do painel neste intervalo. O que ainda não foi lançado não entra na conta.',stats,groups:[
+  {title:'Por tipo de instituição',items:tally(x=>x.tipo||'Não informado')},
+  {title:'Por faixa etária ou perfil',items:tally(x=>String(x.serie||'').trim())}
+ ].filter(g=>g.items.length)}];
+ const posRows=[];
+ comPos.forEach(v=>{String(v.pos).split(/\n+/).map(s=>s.trim()).filter(s=>s.length>2).forEach(line=>{
+  const ctx=[v.escola,fd(v.data)].filter(Boolean).join(', ');
+  posRows.push({txt:line,show:relClip(line,500)+(ctx?' ('+ctx+')':'')});
+ })});
+ const notasPeriodo=N.filter(x=>['Ocorrência','Observação'].includes(x.tipo)&&(r(x.data)||(!x.data&&relIn(x.ts,f,t))));
+ const posGroups=relBucket(posRows,REL_TEMAS,x=>x.txt,'Outras observações da visita',x=>x.show);
+ if(notasPeriodo.length)posGroups.push({title:'Notas da supervisão',items:relUniq(notasPeriodo.map(x=>relClip((x.titulo?x.titulo+': ':'')+(x.texto||''),500)))});
+ sections.push({title:'Ocorrências e notas do período',intro:'Observações do campo de pós-visita, de toda a equipe, reunidas por tema.',groups:posGroups.length?posGroups:[{title:'',items:['Nenhuma observação de pós-visita neste período.']}]});
+ const abertos=[];
+ mural.forEach(x=>{const tx=String(x.texto||'').trim();if(tx)abertos.push({txt:tx,kind:'mural'})});
+ notasAbertas.forEach(x=>{let tx=relClip((x.titulo?x.titulo+': ':'')+(x.texto||''),500);if(x.prio&&x.prio!='Normal')tx+=' · '+x.prio;if(tx)abertos.push({txt:tx,kind:x.tipo})});
+ const abGroups=relBucket(abertos,REL_CATS,x=>x.txt,x=>x.kind=='Solicitação à gestão'?'Solicitações à gestão':x.kind=='Necessidade'?'Necessidades':x.kind=='Pendência'?'Pendências':'Outros encaminhamentos');
+ sections.push({title:'Pendências, solicitações e necessidades em aberto',intro:'Tópicos do mural ainda não resolvidos, reunidos por tema, com as pendências abertas da gestão. Esta parte mostra o que está em aberto agora, não só o que foi criado no período.',groups:abGroups.length?abGroups:[{title:'',items:['Nenhum item em aberto.']}]});
+ const cardOf=x=>{const d=(dtOf(x)||'').slice(0,10);return {title:x.titulo||'Oficina',meta:[fd(d),x.publico,x.dur?x.dur+' min':'',x.espaco].filter(Boolean).join(' · '),body:[x.obj?'Objetivo: '+relClip(x.obj,240):'',x.obra?'Relação com a exposição: '+relClip(x.obra,180):'',x.mat?'Materiais: '+relClip(x.mat,180):''].filter(Boolean)}};
+ sections.push({title:'Oficinas realizadas',intro:'Oficinas aprovadas ou em piloto com data neste período.',cards:ofiFeitas.map(cardOf),empty:ofiFeitas.length?'':'Nenhuma oficina realizada neste período.'});
+ if(ofiPrev.length)sections.push({title:'Oficinas previstas',intro:'Ainda por acontecer dentro do período escolhido.',cards:ofiPrev.map(cardOf)});
+ const matGroups=[];
+ if(mats.length)matGroups.push({title:'Materiais educativos',items:mats.map(x=>x.titulo||'Sem título')});
+ if(vids.length)matGroups.push({title:'Vídeos de apoio',items:vids.map(x=>[x.titulo,x.tipo].filter(Boolean).join(' · '))});
+ if(extras.length)matGroups.push({title:'Materiais extras',items:extras.map(x=>x.titulo||x.url||'Sem título')});
+ if(estudos.length)matGroups.push({title:'Horários de estudo',items:estudos.map(x=>[x.tema,x.dia,x.hora,x.tipo].filter(Boolean).join(' · '))});
+ if(matGroups.length)sections.push({title:'Materiais de estudo incluídos',intro:'Itens acrescentados ao painel neste período.',groups:matGroups});
+ const visuais=[];
+ if(fotos.length)visuais.push({title:'Fotos',items:fotos.map(x=>x.legenda?relClip(x.legenda,160):'Foto sem legenda')});
+ if(galVid.length)visuais.push({title:'Vídeos de registro',items:galVid.map(x=>x.legenda?relClip(x.legenda,160):'Vídeo sem legenda')});
+ if(obras.length)visuais.push({title:'Obras cadastradas',items:obras.map(x=>[x.titulo,x.autor].filter(Boolean).join(' — '))});
+ if(visuais.length)sections.push({title:'Registros visuais',groups:visuais});
+ if(ideiasNovas.length)sections.push({title:'Ideias de oficina recebidas',groups:[{title:'',items:ideiasNovas.map(x=>[x.titulo,x.publico].filter(Boolean).join(' · '))}]});
+ if(notasObra.length){const by=new Map();notasObra.forEach(x=>{const o=(S.obras||[]).find(w=>w.id==x.obra);const k=o?(o.titulo||'Obra'):'Obra';if(!by.has(k))by.set(k,[]);by.get(k).push(relClip(x.texto,400))});sections.push({title:'Notas de mediação nas obras',groups:[...by.entries()].map(([title,items])=>({title,items:relUniq(items)}))})}
+ if(cartas.length)sections.push({title:'Cartas novas',groups:[{title:'',items:cartas.map(x=>x.frente||x.verso||'Carta')}]});
+ if(dest.length)sections.push({title:'Destaques publicados',groups:[{title:'',items:dest.map(x=>[x.etiqueta,x.titulo].filter(Boolean).join(' · '))}]});
+ const escala=[];
+ if(trocas.length)escala.push({title:'Folgas e coberturas',items:trocas.sort(so).map(x=>[fd(x.data),x.pessoa,x.tipo,x.obs].filter(Boolean).join(' · '))});
+ if(doms.length)escala.push({title:'Domingos',items:doms.sort(so).map(x=>[fd(x.data),x.pessoa,x.turno].filter(Boolean).join(' · '))});
+ if(escala.length)sections.push({title:'Escala no período',groups:escala});
+ const prox=A.filter(x=>x.data>t&&ok(x)).sort(so).slice(0,8);
+ if(prox.length)sections.push({title:'Próximas visitas',groups:[{title:'',items:prox.map(x=>[fd(x.data),x.hora,x.escola,x.alunos?x.alunos+' pessoas':'',x.status].filter(Boolean).join(' · '))}]});
+ return {de:fd(f),ate:fd(t),sections};
+}
+function relTexto(doc){
+ const lines=['RELATÓRIO DE MEDIAÇÃO · Sesc Piracicaba','Exposição Letras & Filetes: Memória Afetiva e Latinidades','Período: '+doc.de+' a '+doc.ate,''];
+ doc.sections.forEach((s,i)=>{
+  lines.push((i+1)+'. '+s.title.toUpperCase());
+  if(s.intro)lines.push(s.intro);
+  (s.stats||[]).forEach(st=>lines.push('• '+st.k+': '+st.v));
+  (s.groups||[]).forEach(g=>{if(g.title)lines.push(g.title);(g.items||[]).forEach(it=>lines.push('• '+it))});
+  (s.cards||[]).forEach(c=>{lines.push('• '+(c.title||'Oficina')+(c.meta?' — '+c.meta:''));(c.body||[]).forEach(b=>lines.push('  '+b))});
+  if(s.empty)lines.push(s.empty);
+  lines.push('');
+ });
+ return lines.join('\n').trim()+'\n';
+}
+function relPDF(doc){
+ const w=window.open('','relatorio');
+ if(!w){toast('Permita a janela do PDF neste endereço e tente de novo.');return}
+ const sesc=(($('.sesc')||{}).currentSrc||($('.sesc')||{}).src||'');
+ const ban=((document.querySelector('.ban img')||{}).currentSrc||(document.querySelector('.ban img')||{}).src||'');
+ const h=s=>esc(s);
+ const body=doc.sections.map((s,i)=>{
+  let html='<section><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
+  if(s.intro)html+='<p class=intro>'+h(s.intro)+'</p>';
+  if(s.stats&&s.stats.length)html+='<div class=stats>'+s.stats.map(st=>'<div><span>'+h(st.k)+'</span><b>'+h(st.v)+'</b></div>').join('')+'</div>';
+  (s.groups||[]).forEach(g=>{if(g.title)html+='<h3>'+h(g.title)+'</h3>';if(g.items&&g.items.length)html+='<ul>'+g.items.map(it=>'<li>'+h(it)+'</li>').join('')+'</ul>'});
+  (s.cards||[]).forEach(c=>{html+='<article><b>'+h(c.title||'Oficina')+'</b>'+(c.meta?'<div class=meta>'+h(c.meta)+'</div>':'')+(c.body||[]).map(b=>'<p>'+h(b)+'</p>').join('')+'</article>'});
+  if(s.empty)html+='<p class=intro>'+h(s.empty)+'</p>';
+  return html+'</section>';
+ }).join('');
+ const logos='<header>'+(ban?'<img class=ban alt="Letras & Filetes" src="'+ban+'">':'<strong>Letras &amp; Filetes</strong>')+(sesc?'<img class=sesc alt="Sesc" src="'+sesc+'">':'<strong>Sesc</strong>')+'</header><div class=stripes></div>';
+ const css='@page{size:A4;margin:14mm 16mm 20mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#23243f;font:11.5pt/1.45 Nunito,system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}header .ban{height:72px;width:auto;max-width:72%}header .sesc{height:52px;width:auto}.stripes{height:6px;background:#c4301b;margin-top:8px;box-shadow:0 5px 0 #ebb819}.eye{margin:18px 0 2px;color:#c4301b;font-weight:800;letter-spacing:.06em;font-size:11px;text-transform:uppercase}h1{margin:0;color:#2d2e5f;font-size:26px;line-height:1.15;font-weight:800}.sub{margin:4px 0 8px;color:#5c5e78}.note{background:#fbf6ea;border-left:4px solid #c4301b;padding:8px 12px;color:#3d3e5c;font-size:11pt;margin:12px 0 4px}h2{display:flex;align-items:center;gap:10px;color:#2d2e5f;font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #c4301b;break-after:avoid}h2 .n{width:26px;height:26px;border-radius:50%;background:#e4b423;color:#2d2e5f;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}h3{margin:12px 0 2px;color:#2d2e5f;font-size:13px;break-after:avoid}.intro{margin:0 0 8px;color:#3d3e5c}.stats{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;margin:6px 0 8px}.stats div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted #e2dcc8;padding:4px 0}.stats b{color:#2d2e5f;white-space:nowrap}ul{margin:4px 0 8px;padding-left:18px}li{margin:3px 0}article{margin:8px 0 10px;break-inside:avoid}article .meta{color:#5c5e78;font-size:10.5pt}article p{margin:2px 0}footer{position:fixed;left:0;right:0;bottom:0;font-size:9pt;color:#8a8778;border-top:1px solid #eee7d3;padding-top:6px}.noprint{position:sticky;top:0;background:#faf6ec;padding:10px 0;margin-bottom:8px}.noprint button{background:#2d2e5f;color:#fff;border:0;border-radius:999px;padding:8px 16px;font:800 14px Nunito,sans-serif;cursor:pointer}@media print{.noprint{display:none}body{padding-bottom:28px}}@media(max-width:700px){.stats{grid-template-columns:1fr}}';
+ const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de mediação · '+h(doc.de)+' a '+h(doc.ate)+'</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet"><style>'+css+'</style></head><body><div class=noprint><button type=button onclick="print()">Salvar como PDF</button></div>'+logos+'<p class=eye>Mediação cultural | Educativo Sesc</p><h1>Relatório de mediação</h1><p class=sub>Período de '+h(doc.de)+' a '+h(doc.ate)+' · Exposição Letras &amp; Filetes</p><p class=note>Relatório gerado a partir dos registros do painel. Revise o texto antes de encaminhar à gestão.</p>'+body+'<footer>Mediação Cultural | Educativo Sesc · Letras &amp; Filetes: Memória Afetiva e Latinidades</footer></body></html>';
+ w.document.open();w.document.write(html);w.document.close();
+ const go=()=>setTimeout(()=>{try{w.focus();w.print()}catch(e){}},300);
+ const imgs=[...w.document.images];
+ if(!imgs.length)go();else Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r}))).then(go);
+}
+const REP=()=>`<div class=card><h3>Relatório para a gestão</h3><p class=d>Monta o panorama do período, as observações de pós-visita da equipe por tema, o mural em aberto por categoria e o resumo das oficinas. Novos registros entram sozinhos na área do mesmo assunto. O PDF segue o padrão visual da exposição.</p><div class=calbar><label>De<input type=date id=rf value="${ISO(-6)}"></label><label>Até<input type=date id=rt value="${ISO(0)}"></label><button class=btn id=rg>Gerar relatório</button><button class=btn id=rpdf>Gerar PDF</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar como nota</button></div><textarea id=ro rows=18 placeholder="O relatório aparece aqui. Ele não salva sozinho: use “Salvar como nota” ou “Copiar texto”. O PDF abre numa nova janela." style="margin-top:8px"></textarea></div>`;
 document.addEventListener('change',async e=>{const t=e.target;if(t.dataset?.an&&MY){try{await db.collection('data/users/'+MY).doc(t.dataset.an).set({texto:t.value});toast('Anotação salva (privada)')}catch(er){toast(ER(er))}}});
 document.addEventListener('click',async e=>{const id=e.target.id;
 if(e.target.dataset?.dt2){const ta=e.target.previousElementSibling,d=new Date().toLocaleDateString('pt-BR');ta.value+=(ta.value?'\n':'')+'['+d+'] ';ta.focus()}
-if(id=='rc'){navigator.clipboard?.writeText($('#ro').value);toast('Relatório copiado')}
+if(id=='rc'){const tx=$('#ro')&&$('#ro').value.trim();if(!tx)return toast('Gere o relatório antes de copiar');navigator.clipboard?.writeText($('#ro').value);toast('Relatório copiado')}
 if(id=='rs'){const tx=$('#ro').value.trim();if(!tx)return toast('Não há texto para salvar');try{await db.collection('notas').doc(uid()).set({titulo:'Relatório '+fd($('#rf').value)+' a '+fd($('#rt').value),tipo:'Relatório semanal',prio:'Normal',data:$('#rt').value,texto:tx,status:'Resolvida',ts:Date.now()});toast('Salvo em Notas gerais')}catch(er){toast(ER(er))}}
-if(id!='rg')return;if($('#ro').value.trim()&&!await ask('Substituir o texto atual pelo relatório gerado?'))return;
-const f=$('#rf').value,t=$('#rt').value,r=d=>d&&d>=f&&d<=t,L=(a,fn)=>a.length?a.map(fn).join('\n'):'  (nenhum)',A=S.agendamentos||[],I=S.ideias||[],N=S.notas||[],ok=x=>x.status!='Cancelado',so=(x,y)=>(x.data+x.hora).localeCompare(y.data+y.hora);
-const ag=A.filter(x=>r(x.data)&&ok(x)).sort(so),re=ag.filter(x=>x.status=='Realizado'),pe=re.reduce((s,x)=>s+(+x.alunos||0),0),prox=A.filter(x=>x.data>t&&ok(x)).sort(so).slice(0,5);
-const t0=new Date(f+'T00:00').getTime(),t1=new Date(t+'T23:59:59').getTime(),nov=I.filter(x=>x.ts>=t0&&x.ts<=t1),ofi=I.filter(x=>dtOf(x)&&r(dtOf(x).slice(0,10))&&(x.status=='Aprovada'||x.status=='Em piloto'));
-const nt=N.filter(x=>x.tipo!='Relatório semanal'&&(r(x.data)||(!x.data&&x.ts>=t0&&x.ts<=t1))),ab=N.filter(x=>x.status!='Resolvida'&&['Pendência','Solicitação à gestão','Necessidade'].includes(x.tipo)),tx=x=>x.texto?': '+x.texto.replace(/\n+/g,' '):'';
-$('#ro').value=`RELATÓRIO SEMANAL · Mediação Cultural · Sesc Piracicaba\nExposição Letras & Filetes\nPeríodo: ${fd(f)} a ${fd(t)}\n\n1. VISITAS\nRealizadas: ${re.length} (${pe} pessoas)\n${L(re,x=>`• ${fd(x.data)} ${x.hora||''} · ${x.escola} · ${x.alunos||'?'} pessoas · ${x.mediador||'—'}${x.pos?'\n   Pós-visita: '+x.pos.replace(/\n+/g,' '):''}`)}\nPrevistas no período e ainda não realizadas:\n${L(ag.filter(x=>x.status!='Realizado'),x=>`• ${fd(x.data)} ${x.hora||''} · ${x.escola} (${x.status||'Agendado'})`)}\nPróximas visitas:\n${L(prox,x=>`• ${fd(x.data)} ${x.hora||''} · ${x.escola} · ${x.alunos||'?'} pessoas`)}\n\n2. OFICINAS E IDEIAS\nOficinas aprovadas/em piloto com data no período:\n${L(ofi,x=>`• ${fd(dtOf(x).slice(0,10))} · ${x.titulo}${x.espaco?' ('+x.espaco+')':''}`)}\nNovas ideias recebidas: ${nov.length}\n${L(nov,x=>`• ${x.titulo} — ${x.autor||'—'}`)}\n\n3. OCORRÊNCIAS E NOTAS DO PERÍODO\n${L(nt,x=>`• [${x.tipo}] ${x.titulo}${tx(x)}`)}\n\n4. PENDÊNCIAS, SOLICITAÇÕES E NECESSIDADES EM ABERTO\n${L(ab,x=>`• [${x.tipo}${x.prio&&x.prio!='Normal'?' · '+x.prio:''}] ${x.titulo}${tx(x)}`)}\n`});
+if(id!='rg'&&id!='rpdf')return;
+const f=$('#rf').value,t=$('#rt').value;if(!f||!t)return toast('Informe o período');if(f>t)return toast('A data inicial precisa ser antes da final');
+if(id=='rg'&&$('#ro').value.trim()&&!await ask('Substituir o texto atual pelo relatório gerado?'))return;
+const doc=montarRelatorio(f,t),tx=relTexto(doc);
+if(id=='rg')$('#ro').value=tx;else{if(!$('#ro').value.trim())$('#ro').value=tx;relPDF(doc)}
+});
 
-function wa(){const n=((S.cfg||{}).whats||{}).num;let a=$('#wa');if(!n){a&&a.remove();return}if(!a){a=document.createElement('a');a.id='wa';a.target='_blank';a.rel='noopener';a.textContent='💬 Falar com a supervisão';document.body.append(a)}a.href='https://wa.me/'+n+'?text='+encodeURIComponent('Olá! Sou da equipe de mediação da exposição Letras & Filetes e preciso de apoio.')}
+function wa(){if(SOGAL)return;const n=((S.cfg||{}).whats||{}).num;let a=$('#wa');if(!n){a&&a.remove();return}if(!a){a=document.createElement('a');a.id='wa';a.target='_blank';a.rel='noopener';a.textContent='💬 Falar com a supervisão';document.body.append(a)}a.href='https://wa.me/'+n+'?text='+encodeURIComponent('Olá! Sou da equipe de mediação da exposição Letras & Filetes e preciso de apoio.')}
 const ACC=()=>{const c=S.cfg||{},ids=((c.supervisao||{}).ids)||[],ps=Object.entries(c).filter(([k])=>k.startsWith('p-')).map(([k,v])=>({id:k.slice(2),nome:v.nome||'(sem nome)'})).filter(x=>x.id!=MY);return `<section class=card style="margin-top:16px"><h3>Quem tem a visão de supervisão</h3><p class=d>Pessoas convidadas como Editor entram na <b>visão de equipe</b>. Marque quem deve ver também a supervisão (Gestão, Painel, Notas). A pessoa precisa atualizar a página. Aparecem aqui as pessoas que já abriram o painel.</p>${ps.map(x=>`<label class=chk style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type=checkbox data-sup="${x.id}" ${ids.includes(x.id)?'checked':''}> ${esc(x.nome)}</label>`).join('')||'<p class=mut>Ninguém ainda. Peça para as pessoas abrirem o painel uma vez.</p>'}</section>`};
 document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.sup||!isEd)return;const c=S.cfg||{},ids=new Set(((c.supervisao||{}).ids)||[]);t.checked?ids.add(t.dataset.sup):ids.delete(t.dataset.sup);try{await db.collection('config').doc('supervisao').set({ids:[...ids]});toast('Salvo. A pessoa deve atualizar a página.')}catch(er){toast(ER(er))}});
 const WAF=()=>`<section class=card style="margin-top:16px"><h3>WhatsApp da supervisão</h3><p class=d>Mostra o botão "Falar com a supervisão" para toda a equipe. O número fica visível para quem acessa o painel.</p><div class=calbar><label>Número com DDD<input id=wan placeholder="(19) 99999-9999" value="${esc((((S.cfg||{}).whats||{}).num||'').replace(/^55/,''))}"></label><button class=btn id=was>Salvar</button></div></section>`;
@@ -560,7 +730,7 @@ o.addEventListener('change',ev=>{if(ev.target.id=='ef-f'&&ev.target.files[0]){nf
 document.body.append(o)});
 
 const DK={'Calendário':'calendario','Obras':'obras','Jornada Educativa':'jornada','Galeria':'galeria','Jogo de cartas':'cartas','Ideias de oficinas':'ideias','Agendamentos':'agendamentos','Equipe':'time','Meus cadernos':'caderno'};
-document.addEventListener('click',e=>{if(e.target.closest('[data-hhome]'))show('home')});document.addEventListener('keydown',e=>{if((e.key=='Enter'||e.key==' ')&&e.target.matches?.('[data-hhome]')){e.preventDefault();show('home')}});
+document.addEventListener('click',e=>{if(SOGAL)return;if(e.target.closest('[data-hhome]'))show('home')});document.addEventListener('keydown',e=>{if(SOGAL)return;if((e.key=='Enter'||e.key==' ')&&e.target.matches?.('[data-hhome]')){e.preventDefault();show('home')}});
 let ROOM=null;S.peers=[];S.pn={};
 function onl(){if(!isEd)return '';const seen=new Set(),l=[];(S.peers||[]).forEach(p=>{if(p.kind!='viewer')return;const k=p.by||p.peer;if(seen.has(k))return;seen.add(k);l.push(p)});
 const nmOf=p=>(p.by&&(S.pn[p.by]||((S.cfg||{})['p-'+p.by]||{}).nome))||'Alguém';
@@ -654,7 +824,7 @@ document.addEventListener('change',e=>{if(e.target.id=='ctema'){CTEMA=e.target.v
 async function exifDate(f){try{const b=await f.slice(0,131072).arrayBuffer(),v=new DataView(b);if(v.getUint16(0)!=0xFFD8)return 0;let o=2;while(o<v.byteLength-4){const mk=v.getUint16(o),len=v.getUint16(o+2);if(mk==0xFFE1){if(v.getUint32(o+4)!=0x45786966)return 0;const t=o+10,le=v.getUint16(t)==0x4949,g16=p=>v.getUint16(p,le),g32=p=>v.getUint32(p,le),ifd=(p,tag)=>{const n=g16(p);for(let i=0;i<n;i++){const e=p+2+i*12;if(g16(e)==tag)return g32(e+8)}return null},ex=ifd(t+g32(t+4),0x8769);if(ex==null)return 0;const d=ifd(t+ex,0x9003);if(d==null)return 0;const m=new TextDecoder().decode(new Uint8Array(b,t+d,19)).match(/(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/);return m?new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime():0}o+=2+len}}catch(e){}return 0}
 async function shrink(f,max=1600){try{const bm=await createImageBitmap(f,{imageOrientation:'from-image'}),r=Math.min(1,max/Math.max(bm.width,bm.height)),c=document.createElement('canvas');c.width=Math.round(bm.width*r);c.height=Math.round(bm.height*r);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return await new Promise(res=>c.toBlob(b=>res(b?new File([b],'foto.jpg',{type:'image/jpeg'}):f),'image/jpeg',.82))}catch(e){return f}}
 async function thumbURI(f,max=640){try{const bm=await createImageBitmap(f,{imageOrientation:'from-image'}),r=Math.min(1,max/Math.max(bm.width,bm.height)),c=document.createElement('canvas');c.width=Math.round(bm.width*r);c.height=Math.round(bm.height*r);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.72)}catch(e){return ''}}
-const GALH=()=>`<section class=card><h3>Galeria</h3><p class=d>Registros da exposição e das ações educativas. Todos podem enviar fotos e vídeos. A ordem segue a data de captura${MEMBER?'; você pode reorganizar arrastando (ou com as setas ◀ ▶) e excluir':''}.</p>${assets?`<form id=gf><label>Fotos e vídeos (até 20 MB cada)<input type=file name=f multiple accept="image/*,video/*"></label><label>Legenda (opcional)<input name=l></label><button class=btn>Enviar</button></form><p class=mut id=gprog></p>`:'<p class=mut>Seu acesso permite apenas visualizar.</p>'}<div id=l-galeria></div></section>`;
+const GALH=()=>`<section class=card><div class=ghd><h3>Galeria</h3>${SOGAL?'':`<button type=button class="btn g" id=gshare>Compartilhar galeria</button>`}</div><p class=d>${SOGAL?'Registros da exposição Letras & Filetes.':`Registros da exposição e das ações educativas. Todos podem enviar fotos e vídeos. A ordem segue a data de captura${MEMBER?'; você pode reorganizar arrastando (ou com as setas ◀ ▶) e excluir':''}.`}</p>${SOGAL?'':assets?`<form id=gf><label>Fotos e vídeos (até 20 MB cada)<input type=file name=f multiple accept="image/*,video/*"></label><label>Legenda (opcional)<input name=l></label><button class=btn>Enviar</button></form><p class=mut id=gprog></p>`:'<p class=mut>Seu acesso permite apenas visualizar.</p>'}<div id=l-galeria></div></section>`;
 const gk=i=>i.pos??i.captured??i.ts;
 let GM=false;const GS=new Set();
 const GTB=a=>`<div class=gtb>${GM?`<button class="btn g" data-gall="1">${GS.size==a.length?'Limpar seleção':'Selecionar tudo ('+a.length+')'}</button><button class=btn data-gdel="1" ${GS.size?'':'disabled'}>Excluir selecionados (${GS.size})</button><button class="btn g" data-gtog="1">Cancelar</button>`:`<button class="btn g" data-gtog="1">☑ Selecionar para excluir</button>`}</div>`;
@@ -691,7 +861,8 @@ document.addEventListener('dragover',e=>{if(GD&&e.target.closest?.('[data-gid]')
 document.addEventListener('drop',e=>{const f=e.target.closest?.('[data-gid]');if(!GD||!f)return;e.preventDefault();const a=[...(S.galeria||[])].sort((x,y)=>gk(y)-gk(x)),to=a.findIndex(x=>x.id==f.dataset.gid);if(GD!=f.dataset.gid)gmove(GD,to);GD=null});
 document.addEventListener('click',e=>{const g=e.target.dataset?.gmv;if(!g)return;const[id,d]=g.split(':'),a=[...(S.galeria||[])].sort((x,y)=>gk(y)-gk(x));gmove(id,a.findIndex(x=>x.id==id)+(+d))});
 function nameDate(n){const m=String(n).match(/(\d{4})[-_]?(\d\d)[-_]?(\d\d)[-_ T]?(\d\d)[-_]?(\d\d)[-_]?(\d\d)/);if(!m)return 0;const d=new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]);return isNaN(d)||m[1]<2000?0:d.getTime()}
-document.addEventListener('submit',async e=>{const f=e.target.closest('#gf');if(!f)return;e.preventDefault();const fs=[...f.elements.f.files],l=(f.elements.l.value||'').trim(),pg=$('#gprog');if(!fs.length)return toast('Escolha uma ou mais fotos ou vídeos');
+document.addEventListener('click',async e=>{if(!e.target.closest('#gshare')||SOGAL)return;const url=location.origin+location.pathname+'?galeria',data={title:'Galeria · Letras & Filetes',text:'Galeria da exposição Letras & Filetes',url};if(navigator.share){try{await navigator.share(data);return}catch(er){if(er&&er.name=='AbortError')return}}try{await navigator.clipboard.writeText(url);toast('Link da galeria copiado')}catch(er){toast('Link: '+url)}});
+document.addEventListener('submit',async e=>{const f=e.target.closest('#gf');if(!f||SOGAL)return;e.preventDefault();const fs=[...f.elements.f.files],l=(f.elements.l.value||'').trim(),pg=$('#gprog');if(!fs.length)return toast('Escolha uma ou mais fotos ou vídeos');
 let done=0,ok=0;const big=[],bad=[],MAX=20*1024*1024,up=async x=>{try{const vid=x.type.startsWith('video')||/\.(mov|mp4|m4v|webm)$/i.test(x.name);if(!vid&&!x.type.startsWith('image')){bad.push(x.name);return}
 if(vid&&x.size>=MAX){big.push(x.name);return}
 const cap=(vid?0:await exifDate(x))||nameDate(x.name)||x.lastModified||Date.now(),blob=vid?x:await shrink(x),r=await assets.upload(blob);await db.collection('galeria').doc(uid()).set({url:r.url,legenda:l,captured:cap,tipo:vid?'video':'foto',uid:MY,ts:Date.now()});ok++}catch(er){bad.push(x.name)}finally{done++;if(pg)pg.textContent=`Enviando ${done}/${fs.length}…`}};
@@ -778,12 +949,13 @@ OWN=false;isEd=false;MEMBER=false;try{MY=user?await user.id():null}catch(e){}
 if(user&&MY&&(user.isOwner()||user.canEdit()))MEMBER=true;
 if(user&&user.isOwner()){isEd=true;if(MY){try{const sd=await db.collection('config').doc('supervisao').get(),v=sd&&sd.exists?sd.data():null;if(v&&Array.isArray(v.ids))isEd=v.ids.includes(MY);let nm0='';try{nm0=((await user.me())||{}).name||''}catch(e){}db.collection('config').doc('p-'+MY).set({nome:nm0||'(sem nome)',ts:Date.now()}).catch(()=>{})}catch(e){isEd=false}}}
 navR();$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.menu){NM=!NM;navR();return}if(NM){NM=false}if(b.dataset.g){NP=b.dataset.g;show(GR[NP].items[0][0])}else if(b.dataset.t){if(b.dataset.np)NP=b.dataset.np;show(b.dataset.t)}};
-Object.keys(CFG).filter(c=>c!='conteudo'&&(c!='notas'||isEd)).forEach(c=>db.collection(c).onSnapshot(s=>{S[c]=s.docs.map(d=>({id:d.id,...d.data()}));draw(c);if(c=='cartas'&&CUR=='cartas')drawC();if(c=='equipe')people();if(CUR=='home')drawH();if(CUR=='time'&&['equipe','trocas','domingos'].includes(c))drawT();dash();cal();if(c=='obras')modal();if(c=='anotobras')obraNotes();if(c=='extras'){muDraw();const mb=document.querySelector('[data-mural]');if(mb){const n=muN();mb.innerHTML='✏️'+(n?'<b>'+n+'</b>':'')}}if(CUR=='trilhas'&&['anotobras','obras'].includes(c))drawTr();if(['equipe','trocas','domingos','agendamentos'].includes(c))initMeds(document);if(c=='agendamentos')bkM()}));
-if(MY)db.collection('data/users/'+MY).onSnapshot(q=>{S.anot={};S.cad=[];S.cads={};S.fav={};S.seen={};q.docs.forEach(d=>d.id.startsWith('seen-')?S.seen[d.id.slice(5)]=1:d.id.startsWith('fav-')?S.fav[d.id.slice(4)]=1:d.id.startsWith('cad-')?S.cads[d.id]=d.data().texto||'':d.id.startsWith('n-')?S.cad.push({id:d.id,...d.data()}):S.anot[d.id]=d.data().texto||'');if(!AN1){AN1=1;draw('equipe')}if(!FB1){FB1=1;setTimeout(syncFav,4000)}drawCad();if(CUR=='home')drawH();if(CUR=='obras')draw('obras');if(OPEN!=null)modal()},()=>{});
-db.collection('config').onSnapshot(q=>{S.cfg=S.cfg||{};q.docs.forEach(d=>S.cfg[d.id]=d.data());wa();dash();if(CUR=='home')drawH()},()=>{});
+(SOGAL?['galeria']:Object.keys(CFG).filter(c=>c!='conteudo'&&(c!='notas'||isEd))).forEach(c=>db.collection(c).onSnapshot(s=>{S[c]=s.docs.map(d=>({id:d.id,...d.data()}));draw(c);if(c=='cartas'&&CUR=='cartas')drawC();if(c=='equipe')people();if(CUR=='home')drawH();if(CUR=='time'&&['equipe','trocas','domingos'].includes(c))drawT();dash();cal();if(c=='obras')modal();if(c=='anotobras')obraNotes();if(c=='extras'){muDraw();const mb=document.querySelector('[data-mural]');if(mb){const n=muN();mb.innerHTML='✏️'+(n?'<b>'+n+'</b>':'')}}if(CUR=='trilhas'&&['anotobras','obras'].includes(c))drawTr();if(['equipe','trocas','domingos','agendamentos'].includes(c))initMeds(document);if(c=='agendamentos')bkM()}));
+if(MY&&!SOGAL)db.collection('data/users/'+MY).onSnapshot(q=>{S.anot={};S.cad=[];S.cads={};S.fav={};S.seen={};q.docs.forEach(d=>d.id.startsWith('seen-')?S.seen[d.id.slice(5)]=1:d.id.startsWith('fav-')?S.fav[d.id.slice(4)]=1:d.id.startsWith('cad-')?S.cads[d.id]=d.data().texto||'':d.id.startsWith('n-')?S.cad.push({id:d.id,...d.data()}):S.anot[d.id]=d.data().texto||'');if(!AN1){AN1=1;draw('equipe')}if(!FB1){FB1=1;setTimeout(syncFav,4000)}drawCad();if(CUR=='home')drawH();if(CUR=='obras')draw('obras');if(OPEN!=null)modal()},()=>{});
+if(!SOGAL)db.collection('config').onSnapshot(q=>{S.cfg=S.cfg||{};q.docs.forEach(d=>S.cfg[d.id]=d.data());wa();dash();if(CUR=='home')drawH()},()=>{});
 function authBtn(){let b=document.getElementById('authbtn');if(!b){b=document.createElement('button');b.id='authbtn';b.type='button';b.className='hbtn';b.style.cssText='width:auto;border-radius:999px;padding:0 14px;font:800 13px Nunito,sans-serif';document.querySelector('.hd').append(b)}if(MY){b.textContent='Sair';b.title='Sair da conta';b.setAttribute('aria-label','Sair');b.onclick=()=>window.painelSignOut&&window.painelSignOut()}else{b.textContent='Entrar';b.title='Entrar para alterar';b.setAttribute('aria-label','Entrar');b.onclick=()=>window.painelLogin&&window.painelLogin()}}
 document.addEventListener('click',e=>{if(e.target.closest('[data-login]')){e.preventDefault();window.painelLogin&&window.painelLogin()}});
-if(isEd){const b=document.createElement('button');b.className='btn g';b.textContent='👁 Ver como equipe';b.onclick=()=>{isEd=!isEd;navR();b.textContent=isEd?'👁 Ver como equipe':'↩ Voltar à supervisão';show(location.hash.slice(1)||'painel');authBtn()};document.querySelector('.hd').append(b)}
-authBtn();
-show(TABS[location.hash.slice(1)]?location.hash.slice(1):'home');initRoom()})();
+if(isEd&&!SOGAL){const b=document.createElement('button');b.className='btn g';b.textContent='👁 Ver como equipe';b.onclick=()=>{isEd=!isEd;navR();b.textContent=isEd?'👁 Ver como equipe':'↩ Voltar à supervisão';show(location.hash.slice(1)||'painel');authBtn()};document.querySelector('.hd').append(b)}
+if(!SOGAL)authBtn();
+addEventListener('hashchange',()=>{if(!SOGAL)return;if(location.hash)history.replaceState(null,'',location.pathname+location.search);if(CUR!='galeria')show('galeria')});
+show(SOGAL?'galeria':TABS[location.hash.slice(1)]?location.hash.slice(1):'home');if(!SOGAL)initRoom()})();
 </script></body></html>
