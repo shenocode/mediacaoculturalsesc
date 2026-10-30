@@ -146,7 +146,7 @@
   var userApi = {
     id: async function () { return ME ? ME.id : null; },
     isOwner: function () { return !!ME && ME.role === 'supervisao'; },
-    canEdit: function () { return !!ME && ME.role === 'supervisao'; },
+    canEdit: function () { return !!ME && (ME.role === 'supervisao' || ME.role === 'equipe'); },
     me: async function () { return ME ? { id: ME.id, name: ME.nome, email: ME.email } : null; },
     profiles: async function (ids) {
       var r = await ok(sb.from('profiles').select('id,nome').in('id', ids));
@@ -203,12 +203,13 @@
   }
 
   /* ---------- tela de login ---------- */
-  var css = '#pm-login{position:fixed;inset:0;z-index:99999;background:#f4f1e8;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Nunito,system-ui,sans-serif}'
-    + '#pm-login form{background:#fff;border-radius:16px;box-shadow:0 6px 30px rgba(0,0,0,.12);padding:24px;width:100%;max-width:360px}'
+  var css = '#pm-login{position:fixed;inset:0;z-index:99999;background:rgba(244,241,232,.92);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Nunito,system-ui,sans-serif}'
+    + '#pm-login form{position:relative;background:#fff;border-radius:16px;box-shadow:0 6px 30px rgba(0,0,0,.12);padding:24px;width:100%;max-width:360px}'
     + '#pm-login h1{font-size:20px;margin:0 0 4px}#pm-login p{margin:0 0 14px;color:#6b6858;font-size:14px}'
     + '#pm-login input{width:100%;box-sizing:border-box;padding:12px;margin:0 0 10px;border:1px solid #cfc9b5;border-radius:10px;font-size:16px}'
     + '#pm-login button{width:100%;padding:12px;border:0;border-radius:10px;font-size:16px;font-weight:800;background:#c8372d;color:#fff;margin-top:2px}'
     + '#pm-login .l{background:none;color:#555;font-weight:700;font-size:14px;margin-top:6px;text-decoration:underline}'
+    + '#pm-login .x{position:absolute;top:8px;right:8px;width:36px;height:36px;padding:0;border-radius:50%;background:#f4f1e8;color:#23243f}'
     + '#pm-login .m{min-height:20px;font-size:14px;color:#b3261e;margin:8px 0 0}';
   function el(h) { var d = document.createElement('div'); d.innerHTML = h; return d.firstChild; }
 
@@ -216,7 +217,8 @@
     var old = document.getElementById('pm-login'); if (old) old.remove();
     if (!document.getElementById('pm-css')) { var s = document.createElement('style'); s.id = 'pm-css'; s.textContent = css; document.head.appendChild(s); }
     var box = el('<div id="pm-login"><form>'
-      + '<h1>Painel de Mediação Cultural</h1><p>Sesc Piracicaba · acesso da equipe</p>'
+      + '<button type=button class=x data-x=1 aria-label="Fechar">✕</button>'
+      + '<h1>Entrar para alterar</h1><p>Sesc Piracicaba · a consulta do painel é livre</p>'
       + '<input name=email type=email autocomplete=username placeholder="E-mail" required>'
       + '<input name=senha type=password autocomplete=current-password placeholder="Senha (mín. 8 caracteres)" minlength=8>'
       + '<button type=submit>Entrar</button>'
@@ -226,6 +228,7 @@
     document.body.appendChild(box);
     var f = box.querySelector('form'), m = box.querySelector('.m');
     if (msg) m.textContent = msg;
+    box.querySelector('[data-x]').onclick = function () { box.remove(); };
     function say(t, good) { m.style.color = good ? '#1b7f3b' : '#b3261e'; m.textContent = t; }
     f.onsubmit = async function (e) {
       e.preventDefault(); say('Entrando…', true);
@@ -258,9 +261,10 @@
   }
   function showPending() {
     var old = document.getElementById('pm-login'); if (old) old.remove();
-    var box = el('<div id="pm-login"><form><h1>Aguardando liberação</h1><p>Sua conta foi criada, mas seu e-mail ainda não foi autorizado pela supervisão.</p><button type=button>Sair</button></form></div>');
+    var box = el('<div id="pm-login"><form><button type=button class=x data-x=1 aria-label="Fechar">✕</button><h1>Aguardando liberação</h1><p>Sua conta foi criada, mas seu e-mail ainda não foi autorizado pela supervisão. Dá para ver o painel; alterações ficam bloqueadas.</p><button type=button data-out=1>Sair</button><button type=button class=l data-x=1>Continuar só vendo</button></form></div>');
     document.body.appendChild(box);
-    box.querySelector('button').onclick = function () { sb.auth.signOut().then(function () { location.reload(); }); };
+    box.querySelector('[data-out]').onclick = function () { sb.auth.signOut().then(function () { location.reload(); }); };
+    box.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { box.remove(); }; });
   }
 
   async function loadProfile(session) {
@@ -269,22 +273,25 @@
   }
 
   var started = false;
-  async function onSession(session) {
-    if (!session) { ME = null; showLogin(); return; }
+  function boot() { if (!started) { started = true; readyResolve(); } }
+  async function onSession(session, ev) {
+    if (!session) { ME = null; boot(); return; }
     var p = await loadProfile(session);
-    if (p.role === 'pendente') { showPending(); return; }
+    if (p.role === 'pendente') { ME = null; showPending(); boot(); return; }
     ME = p;
     var box = document.getElementById('pm-login'); if (box) box.remove();
-    if (!started) { started = true; readyResolve(); }
+    if (started && ev === 'SIGNED_IN') { location.reload(); return; }
+    boot();
   }
 
   sb.auth.onAuthStateChange(function (ev, session) {
     if (ev === 'PASSWORD_RECOVERY') { showNewPassword(); return; }
-    if (ev === 'SIGNED_OUT') { location.reload(); return; }
-    if (ev === 'INITIAL_SESSION' || ev === 'SIGNED_IN') setTimeout(function () { onSession(session); }, 0);
+    if (ev === 'SIGNED_OUT') { if (started) location.reload(); else { ME = null; boot(); } return; }
+    if (ev === 'INITIAL_SESSION' || ev === 'SIGNED_IN') setTimeout(function () { onSession(session, ev); }, 0);
   });
 
   window.painelSignOut = function () { return sb.auth.signOut(); };
+  window.painelLogin = function () { showLogin(); };
 
   /* ---------- ponto de entrada esperado pelo painel ---------- */
   window.claude = {
@@ -294,7 +301,7 @@
       if (name === 'user') return userApi;
       if (name === 'assets') return assetsApi;
       if (name === 'downloads') return dlApi;
-      if (name === 'room') return roomApi || (roomApi = makeRoom());
+      if (name === 'room') { if (!ME) return null; return roomApi || (roomApi = makeRoom()); }
       return null;
     }
   };
