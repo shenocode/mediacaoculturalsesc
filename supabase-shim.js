@@ -278,9 +278,10 @@
     if (!session) { ME = null; boot(); return; }
     var p = await loadProfile(session);
     if (p.role === 'pendente') { ME = null; showPending(); boot(); return; }
+    var same = !!(ME && session.user && ME.id === session.user.id);
     ME = p;
     var box = document.getElementById('pm-login'); if (box) box.remove();
-    if (started && ev === 'SIGNED_IN') { location.reload(); return; }
+    if (started && ev === 'SIGNED_IN' && !same) { location.reload(); return; }
     boot();
   }
 
