@@ -293,6 +293,12 @@
 
   window.painelSignOut = function () { return sb.auth.signOut(); };
   window.painelLogin = function () { showLogin(); };
+  window.painelSetPassword = async function (password) {
+    if (!ME) throw new Error('Entre na sua conta para alterar a senha.');
+    if (!password || String(password).length < 8) throw new Error('Use pelo menos 8 caracteres.');
+    var r = await sb.auth.updateUser({ password: String(password) });
+    if (r.error) throw new Error(r.error.message);
+  };
 
   /* ---------- ponto de entrada esperado pelo painel ---------- */
   window.claude = {
