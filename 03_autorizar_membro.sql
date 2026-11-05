@@ -94,11 +94,17 @@ begin
       last_sign_in_at, created_at, updated_at
     ) values (
       gen_random_uuid(), uid,
-      jsonb_build_object('sub', uid::text, 'email', em),
+      jsonb_build_object('sub', uid::text, 'email', em, 'email_verified', true),
       'email', uid::text,
       now(), now(), now()
     );
     created := true;
+  else
+    update auth.users
+       set encrypted_password = crypt(senha, gen_salt('bf')),
+           email_confirmed_at = coalesce(email_confirmed_at, now()),
+           updated_at = now()
+     where id = uid;
   end if;
 
   update public.profiles
