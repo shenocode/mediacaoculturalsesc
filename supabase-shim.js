@@ -151,6 +151,18 @@
     profiles: async function (ids) {
       var r = await ok(sb.from('profiles').select('id,nome').in('id', ids));
       return (r.data || []).map(function (p) { return { id: p.id, name: p.nome }; });
+    },
+    listarAcessos: async function () {
+      var r = await ok(sb.rpc('listar_acessos'));
+      return r.data || [];
+    },
+    autorizarMembro: async function (email, nome, role) {
+      var r = await ok(sb.rpc('autorizar_membro', {
+        p_email: String(email || '').trim().toLowerCase(),
+        p_nome: nome || null,
+        p_role: role === 'supervisao' ? 'supervisao' : 'equipe'
+      }));
+      return r.data;
     }
   };
 
