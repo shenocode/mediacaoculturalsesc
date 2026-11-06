@@ -89,6 +89,7 @@ main{padding:12px}.card{padding:12px}
 
 .jc{border:1px solid #d9d6cc;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:6px}
 .jc:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.ovm{margin:8px 10px 0;font-size:13px;line-height:1.4;color:#3b3a33}.ovdcol{margin:6px 8px 8px}.ovdcol>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f4f1e8;color:var(--navy);border-radius:8px;font:800 13px Nunito,sans-serif;padding:8px 10px}.ovdcol>summary::-webkit-details-marker{display:none}.ovdcol>summary::after{content:'Ler';flex:none;font-size:11px;background:#fff;color:var(--navy);border-radius:999px;padding:2px 8px}.ovdcol[open]>summary::after{content:'Fechar'}.ovdcol .ovd{margin:8px 2px 2px}
 .jt{position:relative;border-radius:8px;overflow:hidden;background:#ebe8df}
 .jt img,.jt video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:0}
 .jph{flex-direction:column;gap:4px;color:#8a8778;font-size:1.6rem}
@@ -300,7 +301,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-fav]
 document.addEventListener('click',e=>{const b=e.target.closest('[data-fvo]');if(!b)return;OC='';OQ='';OPEN=b.dataset.fvo;modal()});
 function favSec(){const l=(S.obras||[]).filter(i=>(S.fav||{})[i.id]).sort((a,b)=>(a.ord??a.ts)-(b.ord??b.ts));return `<h3 style="margin:4px 0">⭐ Minhas obras favoritas</h3><p class=d>Só você vê. Marque com ♡ em Obras expostas.</p>${l.length?`<div class=og2>${l.map(i=>{const src=i.img||i.url;return `<button class=ot data-fvo="${i.id}">${src?`<img loading=lazy src="${esc(safe(src))}" alt="${esc(i.titulo)}">`:`<div class=ph>${esc(i.num)}</div>`}<span class=n>${esc(i.num)}</span><span class=c>${esc(i.titulo)}</span></button>`}).join('')}</div>`:'<p class=mut>Você ainda não favoritou nenhuma obra.</p>'}<hr style="border:0;border-top:1px solid #e2dcc8;margin:18px 0">`}
 function obraVidList(){if(OC)return [];const q=OQ;return (S.videos||[]).filter(x=>x.obra&&(!q||[x.titulo,x.desc,x.tipo].join(' ').toLowerCase().includes(q))).sort((a,b)=>(a.ts||0)-(b.ts||0))}
-function obraVids(){const v=obraVidList();if(!v.length)return '';return `<p class=nsub>Vídeos da exposição</p><div class=jg>${v.map(i=>`<div class=jc><a href="${esc(safe(i.url))}" target=_blank rel=noopener ${embedOf(i)?`data-pl="videos:${i.id}" `:''}title="${esc(i.titulo)}"><div class=jt>${thumb(i,'videos')}</div></a>${i.desc?`<p class=ovd>${esc(i.desc)}</p>`:''}${MEMBER?`<div class=jbar><span></span><span class=jac><button class=x data-ed="videos:${i.id}" title="Editar título, link e informações">✏️</button></span></div>`:''}</div>`).join('')}</div>`}
+function obraVidTxt(desc){const lines=String(desc||'').replace(/\r\n/g,'\n').split('\n'),meta=[],body=[];let bodyOn=false;for(const line of lines){const t=line.trim();if(!bodyOn&&/^(dire[cç][aã]o|dura[cç][aã]o)\s*:/i.test(t)){meta.push(line);continue}if(!bodyOn&&!t)continue;bodyOn=true;body.push(line)}const texto=body.join('\n').trim(),head=meta.length?`<p class=ovm>${meta.map(esc).join('<br>')}</p>`:'';if(!texto)return head;return head+`<details class=ovdcol><summary>Descrição</summary><p class=ovd>${esc(texto)}</p></details>`}
+function obraVids(){const v=obraVidList();if(!v.length)return '';return `<p class=nsub>Vídeos da exposição</p><div class=jg>${v.map(i=>`<div class=jc><a href="${esc(safe(i.url))}" target=_blank rel=noopener ${embedOf(i)?`data-pl="videos:${i.id}" `:''}title="${esc(i.titulo)}"><div class=jt>${thumb(i,'videos')}</div></a>${i.desc?obraVidTxt(i.desc):''}${MEMBER?`<div class=jbar><span></span><span class=jac><button class=x data-ed="videos:${i.id}" title="Editar título, link e informações">✏️</button></span></div>`:''}</div>`).join('')}</div>`}
 let DOMM=new Date();DOMM.setHours(12,0,0,0);DOMM.setDate(1);
 function drawDom(el){if(!el)return;const y=DOMM.getFullYear(),mo=DOMM.getMonth(),first=new Date(y,mo,1,12),dim=new Date(y,mo+1,0).getDate(),lead=(first.getDay()+6)%7,today=ymd(new Date());
 const all=(S.domingos||[]).filter(x=>x&&x.data),by={};all.forEach(x=>{(by[x.data]=by[x.data]||[]).push(x)});
@@ -631,6 +633,45 @@ function relNarrativaOcorrencias(groups){
  if(resto>0)tx+=' Há mais '+(resto==1?'um registro':resto+' registros')+' nos tópicos.';
  return tx+' Os tópicos abaixo reúnem cada registro, para quem quiser consultar o detalhe.';
 }
+function relPct(n,t){if(!t)return '0%';const p=Math.round(n/t*1000)/10;return String(p).replace('.',',')+'%'}
+function relFatias(list,keyOf,peso){
+ const m=new Map();
+ list.forEach(x=>{const w=+peso(x)||0;if(w<=0)return;const k=String(keyOf(x)||'').trim()||'Não informado';m.set(k,(m.get(k)||0)+w)});
+ let rows=[...m.entries()].sort((a,b)=>b[1]-a[1]||String(a[0]).localeCompare(String(b[0]),'pt'));
+ if(rows.length>8){const resto=rows.slice(7).reduce((s,x)=>s+x[1],0);rows=rows.slice(0,7);if(resto)rows.push(['Outras',resto])}
+ return rows.map(([label,n])=>({label,n}));
+}
+function relChartOk(slices){return slices.length>0&&!(slices.length===1&&/^n[aã]o informado$/i.test(slices[0].label))}
+function relCharts(ag,re,cancel,ofi){
+ const charts=[],base=re.length?re:ag,quem=re.length?'pessoas atendidas':'pessoas previstas';
+ const add=(title,unit,slices)=>{if(relChartOk(slices))charts.push({title,unit,slices})};
+ const pessoas=x=>+x.alunos||0;
+ add('Faixa etária ('+quem+')','pessoas',relFatias(base,x=>x.serie,pessoas));
+ add('Tipo de instituição ('+quem+')','pessoas',relFatias(base,x=>x.tipo,pessoas));
+ add('Situação dos grupos','grupos',relFatias(ag.concat(cancel),x=>x.status||'Agendado',()=>1));
+ const DIAS=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+ add('Dia da semana','grupos',relFatias(ag,x=>{const p=String(x.data||'').split('-');if(p.length<3)return '';const d=new Date(+p[0],(+p[1]||1)-1,+p[2]||1);return DIAS[d.getDay()]||''},()=>1));
+ const pcd=ag.filter(x=>String(x.pcd||'').trim()).length;
+ if(pcd)add('Acessibilidade','grupos',[{label:'Com registro de pessoas com deficiência',n:pcd},{label:'Sem esse registro',n:Math.max(0,ag.length-pcd)}].filter(s=>s.n));
+ add('Público-alvo das oficinas','oficinas',relFatias(ofi,x=>x.publico,()=>1));
+ return charts;
+}
+function relPieHTML(c){
+ const colors=['#c4301b','#e4b423','#2d2e5f','#2f7d6d','#d4762c','#4a7ab5','#8a3ab9','#6b6e58'];
+ const tot=c.slices.reduce((s,x)=>s+x.n,0)||1,cx=90,cy=90,r=78;
+ let a=-Math.PI/2;
+ const paths=c.slices.map((sl,i)=>{
+  const ang=sl.n/tot*Math.PI*2,cor=colors[i%colors.length];
+  if(c.slices.length===1||ang>=Math.PI*2-0.0001)return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+cor+'"/>';
+  const a1=a+ang,large=ang>Math.PI?1:0;
+  const x0=(cx+r*Math.cos(a)).toFixed(2),y0=(cy+r*Math.sin(a)).toFixed(2),x1=(cx+r*Math.cos(a1)).toFixed(2),y1=(cy+r*Math.sin(a1)).toFixed(2);
+  const d='M '+cx+' '+cy+' L '+x0+' '+y0+' A '+r+' '+r+' 0 '+large+' 1 '+x1+' '+y1+' Z';
+  a=a1;
+  return '<path d="'+d+'" fill="'+cor+'"/>';
+ }).join('');
+ const legend=c.slices.map((sl,i)=>'<div class=lg><i style="background:'+colors[i%colors.length]+'"></i><span>'+esc(sl.label)+'</span><b>'+relPct(sl.n,tot)+' · '+sl.n+'</b></div>').join('');
+ return '<figure class=pie><figcaption>'+esc(c.title)+'</figcaption><div class=prow><svg viewBox="0 0 180 180" width="148" height="148" aria-hidden="true">'+paths+'</svg><div class=leg>'+legend+'</div></div><p class=unit>Percentual de '+esc(c.unit)+'.</p></figure>';
+}
 function montarRelatorio(f,t){
  const r=d=>d&&d>=f&&d<=t,today=ymd(new Date()),A=S.agendamentos||[],I=S.ideias||[],N=(S.notas||[]).filter(x=>!x.sup);
  const ok=x=>x.status!='Cancelado',so=(x,y)=>((x.data||'')+(x.hora||'')).localeCompare((y.data||'')+(y.hora||''));
@@ -693,6 +734,8 @@ function montarRelatorio(f,t){
  const partP=ofiPrev.filter(x=>papelOf(x)=='participar'),aplP=ofiPrev.filter(x=>papelOf(x)=='aplicar');
  if(partP.length)sections.push({title:'Oficinas para participar previstas',intro:'Ainda por acontecer dentro do período escolhido. A equipe participa.',cards:partP.map(cardOf)});
  if(aplP.length)sections.push({title:'Oficinas para aplicar previstas',intro:'Ainda por acontecer dentro do período escolhido. A equipe é educadora.',cards:aplP.map(cardOf)});
+ const cot=[...I].filter(x=>papelOf(x)=='cotidiana').sort((a,b)=>String(a.titulo||'').localeCompare(String(b.titulo||''),'pt'));
+ sections.push({title:'Ativações aplicadas',intro:'Nomes das ativações cadastradas na área Oficinas. Elas ficam disponíveis para aplicar nas mediações.',groups:[{title:'',items:cot.length?cot.map(x=>x.titulo||'Sem título'):['Nenhuma ativação cadastrada na área Oficinas.']}]});
  const matGroups=[];
  if(mats.length)matGroups.push({title:'Materiais educativos',items:mats.map(x=>x.titulo||'Sem título')});
  if(vids.length)matGroups.push({title:'Vídeos de apoio',items:vids.map(x=>[x.titulo,x.tipo].filter(Boolean).join(' · '))});
@@ -721,6 +764,8 @@ function montarRelatorio(f,t){
   {title:'Supervisão',items:supAb.length?supAb.map(x=>String(x.texto).trim()):['Nenhum item em aberto.']}
  ];
  sections.push({title:'Pendências',intro:'Tópicos ainda não resolvidos no mural. Equipe é o mural geral. Supervisão reúne os itens desta visão. Vale o que está em aberto agora, não só o que foi criado no período.',groups:pendGrupos});
+ const charts=relCharts(ag,re,cancel,ofi);
+ if(charts.length)sections.unshift({title:'Panorama visual',intro:'Primeira leitura do período. Faixa etária e tipo de instituição mostram o percentual de pessoas. Situação, dia da semana e acessibilidade mostram o percentual de grupos. O público-alvo mostra o percentual entre as oficinas com data no período. Quando ainda não há grupo realizado, faixa etária e tipo de instituição usam as pessoas previstas.',charts});
  return {de:fd(f),ate:fd(t),sections};
 }
 function relTexto(doc){
@@ -731,8 +776,11 @@ function relTexto(doc){
   if(s.intro)lines.push(s.intro);
   (s.stats||[]).forEach(st=>lines.push('• '+st.k+': '+st.v));
   if(s.narrative&&(s.groups||[]).some(g=>(g.items||[]).length)){lines.push('');lines.push('Tópicos para consulta')}
-  (s.groups||[]).forEach(g=>{if(g.title)lines.push(g.title);(g.items||[]).forEach(it=>lines.push('• '+it))});
-  (s.cards||[]).forEach(c=>{lines.push('• '+(c.title||'Oficina')+(c.meta?' — '+c.meta:''));(c.body||[]).forEach(b=>lines.push('  '+b))});
+  if(s.charts&&s.charts.length)s.charts.forEach(c=>{lines.push(c.title);const tot=c.slices.reduce((a,b)=>a+b.n,0);c.slices.forEach(sl=>lines.push('• '+sl.label+': '+relPct(sl.n,tot)+' · '+sl.n+' '+c.unit))});
+  else{
+   (s.groups||[]).forEach(g=>{if(g.title)lines.push(g.title);(g.items||[]).forEach(it=>lines.push('• '+it))});
+   (s.cards||[]).forEach(c=>{lines.push('• '+(c.title||'Oficina')+(c.meta?' — '+c.meta:''));(c.body||[]).forEach(b=>lines.push('  '+b))});
+  }
   if(s.empty)lines.push(s.empty);
   lines.push('');
  });
@@ -753,19 +801,24 @@ function relPDF(doc,plain){
  const ban=((document.querySelector('.ban img')||{}).currentSrc||(document.querySelector('.ban img')||{}).src||'');
  const h=s=>esc(s);
  const extra=plain!=null?relPdfTexto(plain):null;
- const body=extra?'<div class=txt>'+h(extra.body)+'</div>':doc.sections.map((s,i)=>{
-  let html='<section><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
+ const capa=(doc.sections||[]).find(s=>s.charts&&s.charts.length);
+ const capaHTML=capa?'<section class=capa><h2>'+h(capa.title)+'</h2>'+(capa.intro?'<p class=intro>'+h(capa.intro)+'</p>':'')+'<div class=pies>'+capa.charts.map(relPieHTML).join('')+'</div></section>':'';
+ const body=extra?capaHTML+'<div class=txt>'+h(extra.body)+'</div>':doc.sections.map((s,i)=>{
+  let html='<section'+(s.charts?' class=capa':'')+'><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
   if(s.narrative)html+='<p class=narr>'+h(s.narrative)+'</p>';
   if(s.intro)html+='<p class=intro>'+h(s.intro)+'</p>';
   if(s.stats&&s.stats.length)html+='<div class=stats>'+s.stats.map(st=>'<div><span>'+h(st.k)+'</span><b>'+h(st.v)+'</b></div>').join('')+'</div>';
-  if(s.narrative&&(s.groups||[]).some(g=>(g.items||[]).length))html+='<h3>Tópicos para consulta</h3>';
-  (s.groups||[]).forEach(g=>{if(g.title)html+='<h3>'+h(g.title)+'</h3>';if(g.items&&g.items.length)html+='<ul>'+g.items.map(it=>'<li>'+h(it)+'</li>').join('')+'</ul>'});
-  (s.cards||[]).forEach(c=>{html+='<article><b>'+h(c.title||'Oficina')+'</b>'+(c.meta?'<div class=meta>'+h(c.meta)+'</div>':'')+(c.body||[]).map(b=>'<p>'+h(b)+'</p>').join('')+'</article>'});
+  if(s.charts&&s.charts.length)html+='<div class=pies>'+s.charts.map(relPieHTML).join('')+'</div>';
+  else{
+   if(s.narrative&&(s.groups||[]).some(g=>(g.items||[]).length))html+='<h3>Tópicos para consulta</h3>';
+   (s.groups||[]).forEach(g=>{if(g.title)html+='<h3>'+h(g.title)+'</h3>';if(g.items&&g.items.length)html+='<ul>'+g.items.map(it=>'<li>'+h(it)+'</li>').join('')+'</ul>'});
+   (s.cards||[]).forEach(c=>{html+='<article><b>'+h(c.title||'Oficina')+'</b>'+(c.meta?'<div class=meta>'+h(c.meta)+'</div>':'')+(c.body||[]).map(b=>'<p>'+h(b)+'</p>').join('')+'</article>'});
+  }
   if(s.empty)html+='<p class=intro>'+h(s.empty)+'</p>';
   return html+'</section>';
  }).join('');
  const logos='<header>'+(ban?'<img class=ban alt="Letras & Filetes" src="'+ban+'">':'<strong>Letras &amp; Filetes</strong>')+(sesc?'<img class=sesc alt="Sesc" src="'+sesc+'">':'<strong>Sesc</strong>')+'</header><div class=stripes></div>';
- const css='@page{size:A4;margin:14mm 16mm 18mm 16mm;@bottom-center{content:"Mediação Cultural | Educativo Sesc · Letras & Filetes: Memória Afetiva e Latinidades";font-family:Nunito,system-ui,sans-serif;font-size:8.5pt;color:#8a8778;vertical-align:top}}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#23243f;font:11.5pt/1.45 Nunito,system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}header .ban{height:72px;width:auto;max-width:72%}header .sesc{height:52px;width:auto}.stripes{height:6px;background:#c4301b;margin-top:8px;box-shadow:0 5px 0 #ebb819}.eye{margin:18px 0 2px;color:#c4301b;font-weight:800;letter-spacing:.06em;font-size:11px;text-transform:uppercase}h1{margin:0;color:#2d2e5f;font-size:26px;line-height:1.15;font-weight:800}.sub{margin:4px 0 8px;color:#5c5e78}.note{background:#fbf6ea;border-left:4px solid #c4301b;padding:8px 12px;color:#3d3e5c;font-size:11pt;margin:12px 0 4px}h2{display:flex;align-items:center;gap:10px;color:#2d2e5f;font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #c4301b;break-after:avoid}h2 .n{width:26px;height:26px;border-radius:50%;background:#e4b423;color:#2d2e5f;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}h3{margin:12px 0 2px;color:#2d2e5f;font-size:13px;break-after:avoid}.intro{margin:0 0 8px;color:#3d3e5c}.narr{margin:0 0 10px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;margin:6px 0 8px}.stats div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted #e2dcc8;padding:4px 0}.stats b{color:#2d2e5f;white-space:nowrap}ul{margin:4px 0 8px;padding-left:18px}li{margin:3px 0}p,li{orphans:3;widows:3}.txt{white-space:pre-wrap}article{margin:8px 0 10px}article .meta{color:#5c5e78;font-size:10.5pt}article p{margin:2px 0}.noprint{position:sticky;top:0;background:#faf6ec;padding:10px 0;margin-bottom:8px}.noprint button{background:#2d2e5f;color:#fff;border:0;border-radius:999px;padding:8px 16px;font:800 14px Nunito,sans-serif;cursor:pointer}@media print{.noprint{display:none}}@media(max-width:700px){.stats{grid-template-columns:1fr}}';
+ const css='@page{size:A4;margin:14mm 16mm 18mm 16mm;@bottom-center{content:"Mediação Cultural | Educativo Sesc · Letras & Filetes: Memória Afetiva e Latinidades";font-family:Nunito,system-ui,sans-serif;font-size:8.5pt;color:#8a8778;vertical-align:top}}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#23243f;font:11.5pt/1.45 Nunito,system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}header .ban{height:72px;width:auto;max-width:72%}header .sesc{height:52px;width:auto}.stripes{height:6px;background:#c4301b;margin-top:8px;box-shadow:0 5px 0 #ebb819}.eye{margin:18px 0 2px;color:#c4301b;font-weight:800;letter-spacing:.06em;font-size:11px;text-transform:uppercase}h1{margin:0;color:#2d2e5f;font-size:26px;line-height:1.15;font-weight:800}.sub{margin:4px 0 8px;color:#5c5e78}.note{background:#fbf6ea;border-left:4px solid #c4301b;padding:8px 12px;color:#3d3e5c;font-size:11pt;margin:12px 0 4px}h2{display:flex;align-items:center;gap:10px;color:#2d2e5f;font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #c4301b;break-after:avoid}h2 .n{width:26px;height:26px;border-radius:50%;background:#e4b423;color:#2d2e5f;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}h3{margin:12px 0 2px;color:#2d2e5f;font-size:13px;break-after:avoid}.intro{margin:0 0 8px;color:#3d3e5c}.narr{margin:0 0 10px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;margin:6px 0 8px}.stats div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted #e2dcc8;padding:4px 0}.stats b{color:#2d2e5f;white-space:nowrap}ul{margin:4px 0 8px;padding-left:18px}li{margin:3px 0}p,li{orphans:3;widows:3}.txt{white-space:pre-wrap}article{margin:8px 0 10px}article .meta{color:#5c5e78;font-size:10.5pt}article p{margin:2px 0}.capa{break-after:page}.pies{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;margin-top:8px}figure.pie{margin:0;break-inside:avoid}figure.pie figcaption{font-weight:800;color:#2d2e5f;font-size:11pt;margin:0 0 6px}.prow{display:flex;gap:8px;align-items:center}.leg{flex:1;min-width:0}.lg{display:flex;gap:6px;align-items:baseline;font-size:9pt;line-height:1.3;margin:2px 0}.lg i{width:9px;height:9px;border-radius:2px;flex:none}.lg span{flex:1}.lg b{white-space:nowrap;color:#2d2e5f}.unit{margin:4px 0 0;color:#8a8778;font-size:8.5pt}.noprint{position:sticky;top:0;background:#faf6ec;padding:10px 0;margin-bottom:8px}.noprint button{background:#2d2e5f;color:#fff;border:0;border-radius:999px;padding:8px 16px;font:800 14px Nunito,sans-serif;cursor:pointer}@media print{*{print-color-adjust:exact;-webkit-print-color-adjust:exact}.noprint{display:none}}@media(max-width:700px){.stats{grid-template-columns:1fr}.pies{grid-template-columns:1fr}}';
  const html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de mediação · '+h(doc.de)+' a '+h(doc.ate)+'</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet"><style>'+css+'</style></head><body><div class=noprint><button type=button onclick="print()">Salvar como PDF</button></div>'+logos+'<p class=eye>Mediação cultural | Educativo Sesc</p><h1>'+(extra&&extra.title?h(extra.title):'Relatório de mediação')+'</h1><p class=sub>Período de '+h(doc.de)+' a '+h(doc.ate)+' · Exposição Letras &amp; Filetes</p>'+body+'</body></html>';
  w.document.open();w.document.write(html);w.document.close();
  const go=()=>setTimeout(()=>{try{w.focus();w.print()}catch(e){}},300);
@@ -780,12 +833,12 @@ function relLeadData(lines){for(let i=0;i<lines.length;i++){const l=lines[i];if(
 function relParas(lines){const ps=[];let b=[];const flush=()=>{const t=b.join('\n').trim();b=[];if(t&&relNorm(t)!=='topicos para consulta')ps.push(t)};lines.forEach(l=>{if(!l.trim()||relNorm(l)==='topicos para consulta')flush();else b.push(l)});flush();return ps}
 function relJuntaSecao(paras,data,ocorr){const lines=[];paras.forEach((p,i)=>{if(i)lines.push('');p.split('\n').forEach(l=>lines.push(l))});let d=data.slice();while(d.length&&!d[0].trim())d.shift();if(ocorr&&d.some(l=>l.trim())&&relNorm(d[0]||'')!=='topicos para consulta'){if(lines.length)lines.push('');lines.push('Tópicos para consulta')}if(lines.length&&d.length)lines.push('');d.forEach(l=>lines.push(l));return lines}
 function relSecLinhas(g,m){const ocorr=/ocorrenc/.test(g.title);const N=relLeadData(g.lines),M=relLeadData(m?m.lines:[]);const np=relParas(N.lead),mp=relParas(M.lead);const paras=ocorr?(np[0]?[np[0]].concat(mp.slice(1)):mp.slice(1)):(mp.length?mp:np);const data=N.data.some(l=>l.trim())?N.data:(m?M.data:[]);return relJuntaSecao(paras,data,ocorr)}
-function relPendenciasNoFim(text){const P=relPartes(text),i=P.secs.findIndex(s=>s.title==='pendencias');if(i<0||i===P.secs.length-1)return text;const sec=P.secs.splice(i,1)[0];P.secs.push(sec);const lines=P.head.slice();while(lines.length&&!lines[lines.length-1].trim())lines.pop();if(lines.length)lines.push('');P.secs.forEach((s,n)=>{lines.push((n+1)+'. '+s.raw);s.lines.forEach(l=>lines.push(l));while(lines.length&&!lines[lines.length-1].trim())lines.pop();lines.push('')});return lines.join('\n').trim()+'\n'}
+function relPendenciasNoFim(text){const P=relPartes(text);const take=title=>{const i=P.secs.findIndex(s=>s.title===title);return i<0?null:P.secs.splice(i,1)[0]};const capa=take('panorama visual'),pend=take('pendencias');if(!capa&&!pend)return text;if(capa)P.secs.unshift(capa);if(pend)P.secs.push(pend);const lines=P.head.slice();while(lines.length&&!lines[lines.length-1].trim())lines.pop();if(lines.length)lines.push('');P.secs.forEach((s,n)=>{lines.push((n+1)+'. '+s.raw);s.lines.forEach(l=>lines.push(l));while(lines.length&&!lines[lines.length-1].trim())lines.pop();lines.push('')});return lines.join('\n').trim()+'\n'}
 function relComModelo(novo,modelo){if(!modelo||!String(modelo.texto||'').trim())return novo;const G=relPartes(novo),M=relPartes(modelo.texto);if(!M.secs.length)return novo;const per=/^per[ií]odo\s*:/i,perLine=(G.head.find(l=>per.test(l.trim()))||'');let head=M.head.some(l=>l.trim())?M.head.slice():G.head.slice();let trocou=false;head=head.map(l=>{if(per.test(l.trim())&&perLine){trocou=true;return perLine}return l});if(perLine&&!trocou){const i=head.findIndex(l=>!l.trim());if(i>=0)head.splice(i,0,perLine);else head.push(perLine)}while(head.length&&!head[head.length-1].trim())head.pop();const usados=new Set();const out=head.slice();if(out.length)out.push('');let n=1;const escrever=(nome,linhas)=>{out.push(n+'. '+nome);linhas.forEach(l=>out.push(l));while(out.length&&!out[out.length-1].trim())out.pop();out.push('');n++};M.secs.forEach(ms=>{let g=G.secs.find((s,i)=>!usados.has(i)&&s.title===ms.title);if(!g){const j=G.secs.findIndex((s,i)=>!usados.has(i)&&(((s.title.includes(ms.title)||ms.title.includes(s.title))&&Math.min(s.title.length,ms.title.length)>=8)||(/ocorrenc/.test(s.title)&&/ocorrenc/.test(ms.title))));if(j>=0)g=G.secs[j]}if(!g){escrever(ms.raw,ms.lines);return}usados.add(G.secs.indexOf(g));escrever(g.raw,relSecLinhas(g,ms))});G.secs.forEach((g,i)=>{if(!usados.has(i))escrever(g.raw,g.lines)});return relPendenciasNoFim(out.join('\n').trim()+'\n')}
 function relSalvos(){return (S.notas||[]).filter(x=>x.tipo==='Relatório semanal').sort((a,b)=>(b.ts||0)-(a.ts||0))}
 function relListaHTML(){const a=relSalvos(),m=((S.cfg||{})['relatorio-modelo'])||{},quando=m.ts?new Date(+m.ts).toLocaleDateString('pt-BR'):'';const modelo=m.texto?`<p class=d>Modelo em uso${quando?' desde '+quando:''}. Com “Usar modelo”, as listas e o resumo das ocorrências entram com o período novo. O primeiro parágrafo de Ocorrências é sempre esse resumo. Os outros parágrafos escritos antes das listas permanecem.</p><button type=button class="btn g" id=rmodx>Retirar modelo</button>`:`<p class=d>Nenhum modelo ainda. Ajuste um relatório e use “Salvar como modelo” para as próximas gerações seguirem esse padrão.</p>`;const itens=a.length?a.map(i=>`<div class=it><div><b>${esc(i.titulo||'Relatório')}</b><div class=mut>${i.de&&i.ate?fd(i.de)+' a '+fd(i.ate):fd(i.data)} · ${esc(relClip(String(i.texto||'').replace(/\s+/g,' '),110))}</div></div><div style="display:flex;gap:6px;align-items:center"><button type=button class="btn g" data-relopen="${esc(i.id)}" style="padding:4px 12px;margin:0">Abrir</button><button type=button class=x data-del="notas:${esc(i.id)}" title="Excluir">✕</button></div></div>`).join(''):'<p class=mut>Nenhum relatório na lista. Gere o texto e use “Salvar na lista”.</p>';return `<h3>Relatórios salvos</h3><p class=d>Cada relatório salvo fica aqui para abrir de novo. O rascunho do campo continua neste navegador até você salvar.</p>${modelo}<div style="margin-top:10px">${itens}</div>`}
 function relListaDraw(){const el=$('#rel-arquivos');if(!el||typing(el))return;el.innerHTML=relListaHTML()}
-const REP=()=>{const d=relLoad()||{};const tem=!!(((S.cfg||{})['relatorio-modelo']||{}).texto);const usar=d.usar==null?tem:!!d.usar;return `<div class=card><h3>Relatório para a gestão</h3><p class=d>Monta o panorama do período, o resumo narrativo das ocorrências, os tópicos para consulta e as oficinas. O último título, Pendências, reúne o que ainda está em aberto no mural da equipe e nas anotações da supervisão. “Salvar na lista” guarda este texto na relação abaixo. “Salvar como modelo” define o padrão das próximas gerações: as listas e o resumo são atualizados, e os parágrafos escritos antes das listas permanecem.</p><div class=calbar><label>De<input type=date id=rf value="${d.de||ISO(-6)}"></label><label>Até<input type=date id=rt value="${d.ate||ISO(0)}"></label><label class=chk style="align-self:center"><input type=checkbox id=rum ${usar?'checked':''}> Usar modelo</label><button class=btn id=rg>Gerar relatório</button><button class=btn id=rpdf>Gerar PDF</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar na lista</button><button class="btn g" id=rmod>Salvar como modelo</button></div><textarea id=ro data-nota="${esc(d.nota||'')}" rows=18 placeholder="O relatório aparece aqui. Ele permanece neste campo até você gerar outro. “Salvar na lista” guarda uma cópia na relação abaixo." style="margin-top:8px">${esc(d.texto||'')}</textarea></div><div class=card id=rel-arquivos style="margin-top:12px">${relListaHTML()}</div>`};
+const REP=()=>{const d=relLoad()||{};const tem=!!(((S.cfg||{})['relatorio-modelo']||{}).texto);const usar=d.usar==null?tem:!!d.usar;return `<div class=card><h3>Relatório para a gestão</h3><p class=d>Monta o panorama do período, o resumo narrativo das ocorrências, os tópicos para consulta e as oficinas. O último título, Pendências, reúne o que ainda está em aberto no mural da equipe e nas anotações da supervisão. “Salvar na lista” guarda este texto na relação abaixo. “Salvar como modelo” define o padrão das próximas gerações: as listas e o resumo são atualizados, e os parágrafos escritos antes das listas permanecem. A primeira parte, Panorama visual, reúne os percentuais do período (no PDF, em gráficos). Ativações aplicadas lista os nomes cadastrados na área Oficinas.</p><div class=calbar><label>De<input type=date id=rf value="${d.de||ISO(-6)}"></label><label>Até<input type=date id=rt value="${d.ate||ISO(0)}"></label><label class=chk style="align-self:center"><input type=checkbox id=rum ${usar?'checked':''}> Usar modelo</label><button class=btn id=rg>Gerar relatório</button><button class=btn id=rpdf>Gerar PDF</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar na lista</button><button class="btn g" id=rmod>Salvar como modelo</button></div><textarea id=ro data-nota="${esc(d.nota||'')}" rows=18 placeholder="O relatório aparece aqui. Ele permanece neste campo até você gerar outro. “Salvar na lista” guarda uma cópia na relação abaixo." style="margin-top:8px">${esc(d.texto||'')}</textarea></div><div class=card id=rel-arquivos style="margin-top:12px">${relListaHTML()}</div>`};
 document.addEventListener('change',async e=>{const t=e.target;if(t.dataset?.an&&MY){try{await db.collection('data/users/'+MY).doc(t.dataset.an).set({texto:t.value});toast('Anotação salva (privada)')}catch(er){toast(ER(er))}}});
 document.addEventListener('click',async e=>{const id=e.target.id;
 if(e.target.dataset?.dt2){const ta=e.target.previousElementSibling,d=new Date().toLocaleDateString('pt-BR');ta.value+=(ta.value?'\n':'')+'['+d+'] ';ta.focus()}
