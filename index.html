@@ -805,15 +805,17 @@ function relFatiaLinha(l){
  if(!n)return null;
  return {label:m[1].trim(),n};
 }
-function relChartsEditados(plain,charts){
- if(!charts||!charts.length)return [];
+function relCapaEditada(plain,charts){
+ const vazio={intro:'',charts:[]};
+ if(!charts||!charts.length)return vazio;
  const sec=relPartes(plain).secs.find(s=>s.title==='panorama visual');
- if(!sec)return [];
+ if(!sec)return vazio;
  const by=new Map(charts.map(c=>[relNorm(c.title),c]));
- const out=[];
- let cur=null;
+ const out=[],lead=[];
+ let cur=null,viu=false,buf=[];
+ const flush=()=>{const t=buf.join(' ').trim();buf=[];if(t)lead.push(t)};
  sec.lines.forEach(l=>{
-  if(!String(l||'').trim())return;
+  if(!String(l||'').trim()){if(!viu)flush();return}
   if(relEhItem(l)||/^\s*\*\s+/.test(l)){
    if(!cur)return;
    const fat=relFatiaLinha(l);
@@ -821,9 +823,12 @@ function relChartsEditados(plain,charts){
    return;
   }
   const hit=by.get(relNorm(l));
-  if(hit){cur={chart:hit,slices:[],livre:[]};out.push(cur)}else cur=null;
+  if(hit){if(!viu)flush();viu=true;cur={chart:hit,slices:[],livre:[]};out.push(cur)}
+  else{cur=null;if(!viu)buf.push(String(l).trim())}
  });
- return out.map(f=>f.slices.length?{title:f.chart.title,unit:f.chart.unit,slices:f.slices}:(f.livre.length?f.chart:null)).filter(Boolean);
+ if(!viu)flush();
+ const pies=out.map(f=>f.slices.length?{title:f.chart.title,unit:f.chart.unit,slices:f.slices}:(f.livre.length?f.chart:null)).filter(Boolean);
+ return {intro:lead.join('\n\n'),charts:pies};
 }
 function relPDF(doc,plain){
  const w=window.open('','relatorio');
@@ -833,8 +838,10 @@ function relPDF(doc,plain){
  const h=s=>esc(s);
  const extra=plain!=null?relPdfTexto(plain):null;
  const capa=(doc.sections||[]).find(s=>s.charts&&s.charts.length);
- const pies=extra?relChartsEditados(plain,capa?capa.charts:[]):(capa?capa.charts:[]);
- const capaHTML=pies.length?'<section class=capa><h2>'+h(capa?capa.title:'Panorama visual')+'</h2>'+(capa&&capa.intro?'<p class=intro>'+h(capa.intro)+'</p>':'')+'<div class=pies>'+pies.map(relPieHTML).join('')+'</div></section>':'';
+ const editada=extra?relCapaEditada(plain,capa?capa.charts:[]):null;
+ const pies=editada?editada.charts:(capa?capa.charts:[]);
+ const introCapa=editada?editada.intro:(capa&&capa.intro||'');
+ const capaHTML=pies.length?'<section class=capa><h2>'+h(capa?capa.title:'Panorama visual')+'</h2>'+(introCapa?introCapa.split(/\n\n+/).map(p=>'<p class=intro>'+h(p)+'</p>').join(''):'')+'<div class=pies>'+pies.map(relPieHTML).join('')+'</div></section>':'';
  const body=extra?capaHTML+'<div class=txt>'+h(extra.body)+'</div>':doc.sections.map((s,i)=>{
   let html='<section'+(s.charts?' class=capa':'')+'><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
   if(s.narrative)html+='<p class=narr>'+h(s.narrative)+'</p>';
