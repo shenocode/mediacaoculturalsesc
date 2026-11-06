@@ -794,6 +794,37 @@ function relPdfTexto(plain){
  while(lines.length&&(!lines[0].trim()||/^exposi[cç][aã]o letras/i.test(lines[0].trim())||/^per[ií]odo\s*:/i.test(lines[0].trim())))lines.shift();
  return {title,body:lines.join('\n').trim()};
 }
+function relFatiaLinha(l){
+ const t=String(l||'').replace(/^\s*[•\-–*]\s+/,'').trim();
+ const m=t.match(/^(.+?):\s*[\d.,]+\s*%\s*[·.|-]\s*([\d.,]+)\b/);
+ if(!m)return null;
+ let raw=m[2].trim();
+ if(raw.includes(',')&&raw.includes('.'))raw=raw.replace(/\./g,'').replace(',','.');
+ else if(raw.includes(','))raw=raw.replace(',','.');
+ const n=parseFloat(raw);
+ if(!n)return null;
+ return {label:m[1].trim(),n};
+}
+function relChartsEditados(plain,charts){
+ if(!charts||!charts.length)return [];
+ const sec=relPartes(plain).secs.find(s=>s.title==='panorama visual');
+ if(!sec)return [];
+ const by=new Map(charts.map(c=>[relNorm(c.title),c]));
+ const out=[];
+ let cur=null;
+ sec.lines.forEach(l=>{
+  if(!String(l||'').trim())return;
+  if(relEhItem(l)||/^\s*\*\s+/.test(l)){
+   if(!cur)return;
+   const fat=relFatiaLinha(l);
+   if(fat)cur.slices.push(fat);else cur.livre.push(l);
+   return;
+  }
+  const hit=by.get(relNorm(l));
+  if(hit){cur={chart:hit,slices:[],livre:[]};out.push(cur)}else cur=null;
+ });
+ return out.map(f=>f.slices.length?{title:f.chart.title,unit:f.chart.unit,slices:f.slices}:(f.livre.length?f.chart:null)).filter(Boolean);
+}
 function relPDF(doc,plain){
  const w=window.open('','relatorio');
  if(!w){toast('Permita a janela do PDF neste endereço e tente de novo.');return}
@@ -802,7 +833,8 @@ function relPDF(doc,plain){
  const h=s=>esc(s);
  const extra=plain!=null?relPdfTexto(plain):null;
  const capa=(doc.sections||[]).find(s=>s.charts&&s.charts.length);
- const capaHTML=capa?'<section class=capa><h2>'+h(capa.title)+'</h2>'+(capa.intro?'<p class=intro>'+h(capa.intro)+'</p>':'')+'<div class=pies>'+capa.charts.map(relPieHTML).join('')+'</div></section>':'';
+ const pies=extra?relChartsEditados(plain,capa?capa.charts:[]):(capa?capa.charts:[]);
+ const capaHTML=pies.length?'<section class=capa><h2>'+h(capa?capa.title:'Panorama visual')+'</h2>'+(capa&&capa.intro?'<p class=intro>'+h(capa.intro)+'</p>':'')+'<div class=pies>'+pies.map(relPieHTML).join('')+'</div></section>':'';
  const body=extra?capaHTML+'<div class=txt>'+h(extra.body)+'</div>':doc.sections.map((s,i)=>{
   let html='<section'+(s.charts?' class=capa':'')+'><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
   if(s.narrative)html+='<p class=narr>'+h(s.narrative)+'</p>';
@@ -838,7 +870,7 @@ function relComModelo(novo,modelo){if(!modelo||!String(modelo.texto||'').trim())
 function relSalvos(){return (S.notas||[]).filter(x=>x.tipo==='Relatório semanal').sort((a,b)=>(b.ts||0)-(a.ts||0))}
 function relListaHTML(){const a=relSalvos(),m=((S.cfg||{})['relatorio-modelo'])||{},quando=m.ts?new Date(+m.ts).toLocaleDateString('pt-BR'):'';const modelo=m.texto?`<p class=d>Modelo em uso${quando?' desde '+quando:''}. Com “Usar modelo”, as listas e o resumo das ocorrências entram com o período novo. O primeiro parágrafo de Ocorrências é sempre esse resumo. Os outros parágrafos escritos antes das listas permanecem.</p><button type=button class="btn g" id=rmodx>Retirar modelo</button>`:`<p class=d>Nenhum modelo ainda. Ajuste um relatório e use “Salvar como modelo” para as próximas gerações seguirem esse padrão.</p>`;const itens=a.length?a.map(i=>`<div class=it><div><b>${esc(i.titulo||'Relatório')}</b><div class=mut>${i.de&&i.ate?fd(i.de)+' a '+fd(i.ate):fd(i.data)} · ${esc(relClip(String(i.texto||'').replace(/\s+/g,' '),110))}</div></div><div style="display:flex;gap:6px;align-items:center"><button type=button class="btn g" data-relopen="${esc(i.id)}" style="padding:4px 12px;margin:0">Abrir</button><button type=button class=x data-del="notas:${esc(i.id)}" title="Excluir">✕</button></div></div>`).join(''):'<p class=mut>Nenhum relatório na lista. Gere o texto e use “Salvar na lista”.</p>';return `<h3>Relatórios salvos</h3><p class=d>Cada relatório salvo fica aqui para abrir de novo. O rascunho do campo continua neste navegador até você salvar.</p>${modelo}<div style="margin-top:10px">${itens}</div>`}
 function relListaDraw(){const el=$('#rel-arquivos');if(!el||typing(el))return;el.innerHTML=relListaHTML()}
-const REP=()=>{const d=relLoad()||{};const tem=!!(((S.cfg||{})['relatorio-modelo']||{}).texto);const usar=d.usar==null?tem:!!d.usar;return `<div class=card><h3>Relatório para a gestão</h3><p class=d>Monta o panorama do período, o resumo narrativo das ocorrências, os tópicos para consulta e as oficinas. O último título, Pendências, reúne o que ainda está em aberto no mural da equipe e nas anotações da supervisão. “Salvar na lista” guarda este texto na relação abaixo. “Salvar como modelo” define o padrão das próximas gerações: as listas e o resumo são atualizados, e os parágrafos escritos antes das listas permanecem. A primeira parte, Panorama visual, reúne os percentuais do período (no PDF, em gráficos). Ativações aplicadas lista os nomes cadastrados na área Oficinas.</p><div class=calbar><label>De<input type=date id=rf value="${d.de||ISO(-6)}"></label><label>Até<input type=date id=rt value="${d.ate||ISO(0)}"></label><label class=chk style="align-self:center"><input type=checkbox id=rum ${usar?'checked':''}> Usar modelo</label><button class=btn id=rg>Gerar relatório</button><button class=btn id=rpdf>Gerar PDF</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar na lista</button><button class="btn g" id=rmod>Salvar como modelo</button></div><textarea id=ro data-nota="${esc(d.nota||'')}" rows=18 placeholder="O relatório aparece aqui. Ele permanece neste campo até você gerar outro. “Salvar na lista” guarda uma cópia na relação abaixo." style="margin-top:8px">${esc(d.texto||'')}</textarea></div><div class=card id=rel-arquivos style="margin-top:12px">${relListaHTML()}</div>`};
+const REP=()=>{const d=relLoad()||{};const tem=!!(((S.cfg||{})['relatorio-modelo']||{}).texto);const usar=d.usar==null?tem:!!d.usar;return `<div class=card><h3>Relatório para a gestão</h3><p class=d>Monta o panorama do período, o resumo narrativo das ocorrências, os tópicos para consulta e as oficinas. O último título, Pendências, reúne o que ainda está em aberto no mural da equipe e nas anotações da supervisão. “Salvar na lista” guarda este texto na relação abaixo. “Salvar como modelo” define o padrão das próximas gerações: as listas e o resumo são atualizados, e os parágrafos escritos antes das listas permanecem. A primeira parte, Panorama visual, reúne os percentuais do período. No PDF, o gráfico só entra se o título dele continuar nesse texto. Ativações aplicadas lista os nomes cadastrados na área Oficinas.</p><div class=calbar><label>De<input type=date id=rf value="${d.de||ISO(-6)}"></label><label>Até<input type=date id=rt value="${d.ate||ISO(0)}"></label><label class=chk style="align-self:center"><input type=checkbox id=rum ${usar?'checked':''}> Usar modelo</label><button class=btn id=rg>Gerar relatório</button><button class=btn id=rpdf>Gerar PDF</button><button class="btn g" id=rc>Copiar texto</button><button class="btn g" id=rs>Salvar na lista</button><button class="btn g" id=rmod>Salvar como modelo</button></div><textarea id=ro data-nota="${esc(d.nota||'')}" rows=18 placeholder="O relatório aparece aqui. Ele permanece neste campo até você gerar outro. “Salvar na lista” guarda uma cópia na relação abaixo." style="margin-top:8px">${esc(d.texto||'')}</textarea></div><div class=card id=rel-arquivos style="margin-top:12px">${relListaHTML()}</div>`};
 document.addEventListener('change',async e=>{const t=e.target;if(t.dataset?.an&&MY){try{await db.collection('data/users/'+MY).doc(t.dataset.an).set({texto:t.value});toast('Anotação salva (privada)')}catch(er){toast(ER(er))}}});
 document.addEventListener('click',async e=>{const id=e.target.id;
 if(e.target.dataset?.dt2){const ta=e.target.previousElementSibling,d=new Date().toLocaleDateString('pt-BR');ta.value+=(ta.value?'\n':'')+'['+d+'] ';ta.focus()}
