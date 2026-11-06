@@ -830,6 +830,16 @@ function relCapaEditada(plain,charts){
  const pies=out.map(f=>f.slices.length?{title:f.chart.title,unit:f.chart.unit,slices:f.slices}:(f.livre.length?f.chart:null)).filter(Boolean);
  return {intro:lead.join('\n\n'),charts:pies};
 }
+function relSemPanorama(text){
+ const P=relPartes(text),i=P.secs.findIndex(s=>s.title==='panorama visual');
+ if(i<0)return text;
+ P.secs.splice(i,1);
+ const lines=P.head.slice();
+ while(lines.length&&!lines[lines.length-1].trim())lines.pop();
+ if(lines.length&&P.secs.length)lines.push('');
+ P.secs.forEach((s,n)=>{lines.push((n+1)+'. '+s.raw);s.lines.forEach(l=>lines.push(l));while(lines.length&&!lines[lines.length-1].trim())lines.pop();lines.push('')});
+ return lines.join('\n').trim();
+}
 function relPDF(doc,plain){
  const w=window.open('','relatorio');
  if(!w){toast('Permita a janela do PDF neste endereço e tente de novo.');return}
@@ -842,7 +852,8 @@ function relPDF(doc,plain){
  const pies=editada?editada.charts:(capa?capa.charts:[]);
  const introCapa=editada?editada.intro:(capa&&capa.intro||'');
  const capaHTML=pies.length?'<section class=capa><h2>'+h(capa?capa.title:'Panorama visual')+'</h2>'+(introCapa?introCapa.split(/\n\n+/).map(p=>'<p class=intro>'+h(p)+'</p>').join(''):'')+'<div class=pies>'+pies.map(relPieHTML).join('')+'</div></section>':'';
- const body=extra?capaHTML+'<div class=txt>'+h(extra.body)+'</div>':doc.sections.map((s,i)=>{
+ const textoPdf=extra?(pies.length?relSemPanorama(extra.body):extra.body):'';
+ const body=extra?capaHTML+(textoPdf?'<div class=txt>'+h(textoPdf)+'</div>':''):doc.sections.map((s,i)=>{
   let html='<section'+(s.charts?' class=capa':'')+'><h2><span class=n>'+(i+1)+'</span>'+h(s.title)+'</h2>';
   if(s.narrative)html+='<p class=narr>'+h(s.narrative)+'</p>';
   if(s.intro)html+='<p class=intro>'+h(s.intro)+'</p>';
