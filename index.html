@@ -678,8 +678,7 @@ function relDias(f,t){
  while(ymd(cur)<=t){out.push(ymd(cur));cur.setDate(cur.getDate()+1);if(out.length>400)break}
  return out;
 }
-const REL_NC_LEG='NC: não contabilizado ou SESC fechado para visitação. Os visitantes espontâneos também não foram contabilizados.';
-function relEspontaneo(x){return /espont[aâ]n/i.test([x&&x.escola,x&&x.tipo,x&&x.serie,x&&x.obs].filter(Boolean).join(' '))}
+const REL_NC_LEG='NC: não contabilizado ou SESC fechado para visitação.';
 function relSomaGrade(grid){
  const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'],por=new Map();
  grid.forEach(row=>{for(let c=0;c<row.length;c+=2){const dia=row[c],qtd=row[c+1];if(!dia||qtd==='NC'||qtd===''||isNaN(+qtd))continue;const m=+String(dia).split('/')[1];if(!m)continue;por.set(m,(por.get(m)||0)+(+qtd))}});
@@ -689,7 +688,7 @@ function relSomaGrade(grid){
 }
 function relGradeDias(re,f,t){
  const by=new Map();
- (re||[]).forEach(x=>{if(relEspontaneo(x))return;const d=x.data;if(!d)return;const raw=x.alunos,tem=String(raw??'').trim()!==''&&!isNaN(+raw);if(!by.has(d))by.set(d,{tem:false,n:0});const c=by.get(d);if(tem){c.tem=true;c.n+=+raw}});
+ (re||[]).forEach(x=>{const d=x.data;if(!d)return;const raw=x.alunos,tem=String(raw??'').trim()!==''&&!isNaN(+raw);if(!by.has(d))by.set(d,{tem:false,n:0});const c=by.get(d);if(tem){c.tem=true;c.n+=+raw}});
  const itens=relDias(f,t).map(d=>{const c=by.get(d);return {dia:fd(d),qtd:c&&c.tem?String(c.n):'NC'}});
  const cols=5,rows=Math.ceil(itens.length/cols),grid=[];
  for(let r=0;r<rows;r++){const row=[];for(let c=0;c<cols;c++){const it=itens[c*rows+r];row.push(it?it.dia:'',it?it.qtd:'')}grid.push(row)}
