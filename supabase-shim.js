@@ -303,6 +303,26 @@
     if (ev === 'INITIAL_SESSION' || ev === 'SIGNED_IN') setTimeout(function () { onSession(session, ev); }, 0);
   });
 
+  window.painelSalvarChaveLeitura = async function (chave) {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão ativa a leitura'); e.code = 'not_granted'; throw e; }
+    await ok(sb.rpc('definir_chave_leitura', { p_chave: String(chave || '').trim() }));
+  };
+  window.painelLerAgenda = async function (images, hoje) {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão lê documentos'); e.code = 'not_granted'; throw e; }
+    var session = (await sb.auth.getSession()).data.session;
+    if (!session) { var e2 = new Error('Entre de novo para ler documentos'); e2.code = 'not_granted'; throw e2; }
+    var r = await fetch(CFG.SUPABASE_URL + '/functions/v1/ler-agenda', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: CFG.SUPABASE_ANON_KEY },
+      body: JSON.stringify({ images: images || [], hoje: hoje || '' })
+    });
+    var j = {};
+    try { j = await r.json(); } catch (err) {}
+    if (!r.ok) { var e3 = new Error(j.error || 'Não foi possível ler os documentos'); if (r.status === 401 || r.status === 403) e3.code = 'not_granted'; throw e3; }
+    return j;
+  };
   window.painelSignOut = function () { return sb.auth.signOut(); };
   window.painelLogin = function () { showLogin(); };
   window.painelSetPassword = async function (password) {

@@ -1,0 +1,4 @@
+project_id = "bokdpzexxnkkireapnza"
+
+[functions.ler-agenda]
+verify_jwt = true
