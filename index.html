@@ -130,8 +130,8 @@ main{padding:12px}.card{padding:12px}
 .jph.otit{background:var(--navy);color:var(--yel);padding:16px 14px}
 .jph.otit .jtt{color:var(--yel);font-family:Bevan,Georgia,serif;font-weight:400;font-size:clamp(17px,2.2vw,24px);line-height:1.2;width:100%;text-align:center;-webkit-line-clamp:5}
 #l-apl .jc{width:100%}
-#l-apl .jc>.jt{aspect-ratio:16/9}
-#l-apl .jc>.jt>.jph{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;border-radius:0;box-sizing:border-box}
+#l-apl .jc>.jt,#l-cot .jc>.jt{aspect-ratio:16/9}
+#l-apl .jc>.jt>.jph,#l-cot .jc>.jt>.jph{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;border-radius:0;box-sizing:border-box}
 #l-apl .jn,#l-apl .jp{padding-left:10px;padding-right:10px}
 #l-apl .jt+.jp{padding-top:8px}
 #l-apl .jp{padding-bottom:8px}
@@ -1542,7 +1542,7 @@ function ofFace(i){const d=dtOf(i),dia=d?fd(d.slice(0,10)):'',h=ofR(i),sem=d?DAY
 function ofCapa(i){const s=i&&i.capa?safe(i.capa):'';return s&&s!='#'?s:''}
 function ofAplFace(i){const tt=esc(i.titulo||'Oficina'),src=ofCapa(i),ph=`<div class="jph otit"><span class=jtt>${tt}</span></div>`;if(!src)return ph;return ph+`<img loading=lazy src="${esc(src)}" alt="" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">`}
 function drawI(){const card=i=>{const apl=papelOf(i)=='aplicar',src=apl&&ofCapa(i);const face=apl?ofAplFace(i):(i.capa?`<img loading=lazy src="${esc(safe(i.capa))}" alt="">`:ofFace(i));return `<button class="jc ic" data-io="${i.id}"><div class=jt>${face}</div>${src||!apl?`<div class=jn>${esc(i.titulo)}</div>`:''}<div class=jp>${esc(i.autor||'')} · ${esc(ofLabel(i))}</div></button>`};
-const cardCot=i=>{const g=gGrupos().find(x=>x.id==i.grupo);return `<button class="jc ic" data-io="${i.id}"><div class=jt>${i.capa?`<img loading=lazy src="${esc(safe(i.capa))}" alt="">`:'<div class=jph style="background:var(--navy)">✋</div>'}</div><div class=jn>${esc(i.titulo)}</div><div class=jp>${g?esc('Fotos: '+gTit(g)):'Sem grupo de fotos'}</div></button>`};
+const cardCot=i=>{const g=gGrupos().find(x=>x.id==i.grupo),src=ofCapa(i),ph='<div class=jph style="background:var(--navy)">✋</div>',face=src?ph+`<img loading=lazy src="${esc(src)}" alt="" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">`:ph;return `<button class="jc ic" data-io="${i.id}"><div class=jt>${face}</div><div class=jn>${esc(i.titulo)}</div><div class=jp>${g?esc('Fotos: '+gTit(g)):'Sem grupo de fotos'}</div></button>`};
 const all=[...(S.ideias||[])].filter(ofPodeVer),a=all.filter(i=>papelOf(i)!='cotidiana'&&ofMatch(i,FS)&&(!FM||i.uid==MY)),cot=all.filter(i=>papelOf(i)=='cotidiana'&&(!FM||i.uid==MY)).sort((x,y)=>String(x.titulo||'').localeCompare(String(y.titulo||''),'pt'));
 const put=(id,list,vazio)=>{const el=$(id);if(!el)return;const esp=id=='#l-apl'&&ofSup()?list.filter(i=>ofPrivado(i)):[];const nota=esp.length?`<p class=d>${esp.length==1?'1 ficha ainda não foi para análise. A supervisão já pode ver.':esp.length+' fichas ainda não foram para análise. A supervisão já pode ver.'} A equipe vê quando o status for Para análise.</p>`:'';el.innerHTML=nota+(list.length?`<div class=jg>${list.map(card).join('')}</div>`:`<p class=mut>${vazio}</p>`)};
 put('#l-part',a.filter(i=>papelOf(i)=='participar').sort(ofNear),'Nenhuma oficina para participar.');
