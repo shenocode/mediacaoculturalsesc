@@ -303,6 +303,35 @@
     if (ev === 'INITIAL_SESSION' || ev === 'SIGNED_IN') setTimeout(function () { onSession(session, ev); }, 0);
   });
 
+  window.painelSalvarChaveMapa = async function (chave) {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão ativa o mapa'); e.code = 'not_granted'; throw e; }
+    await ok(sb.rpc('definir_chave_mapa', { p_chave: String(chave || '').trim() }));
+  };
+  window.painelLogistica = async function (body) {
+    await ready;
+    var session = (await sb.auth.getSession()).data.session;
+    var token = session ? session.access_token : CFG.SUPABASE_ANON_KEY;
+    var r = await fetch(CFG.SUPABASE_URL + '/functions/v1/logistica-visita', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, apikey: CFG.SUPABASE_ANON_KEY },
+      body: JSON.stringify(body || {})
+    });
+    var j = {};
+    try { j = await r.json(); } catch (err) {}
+    if (!r.ok) {
+      var e3 = new Error(j.error || 'Não foi possível consultar os horários');
+      e3.status = r.status;
+      if (r.status === 401 || r.status === 403) e3.code = 'not_granted';
+      throw e3;
+    }
+    return j;
+  };
+  window.painelSolicitarVisita = async function (ficha) {
+    await ready;
+    var r = await ok(sb.rpc('solicitar_visita', { p: ficha || {} }));
+    return r.data;
+  };
   window.painelSalvarChaveLeitura = async function (chave) {
     await ready;
     if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão ativa a leitura'); e.code = 'not_granted'; throw e; }

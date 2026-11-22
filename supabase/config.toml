@@ -2,3 +2,6 @@ project_id = "bokdpzexxnkkireapnza"
 
 [functions.ler-agenda]
 verify_jwt = true
+
+[functions.logistica-visita]
+verify_jwt = false
