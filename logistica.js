@@ -313,9 +313,9 @@
         var pedido = v.status === 'Solicitado';
         return '<button type=button class="ch ' + (pedido ? 'logsol' : 'a') + '" data-bk="' + esc(v.id) + '">' + esc((v.hora ? v.hora + ' ' : '') + (v.escola || 'Grupo')) + '</button>';
       }).join('');
-      cells += '<div class="cd' + (k === hoje ? ' today' : '') + '"><b>' + d + '</b>' + chips + '</div>';
+      cells += '<div class="cd' + (k === hoje ? ' today' : '') + '" data-agd="' + k + '" title="Clique para agendar neste dia"><b>' + d + '</b>' + chips + '</div>';
     }
-    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>O tracejado é um pedido aguardando confirmação. Ele fica nesta aba. O Calendário da equipe mostra a visita quando o status deixa de ser Solicitado.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação neste mês.' : ' solicitações neste mês.') + '</p><div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div></section>';
+    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>Clique num dia para abrir o agendamento já com essa data. Clique numa visita para abrir a ficha dela. O tracejado é um pedido aguardando confirmação e fica nesta aba. O Calendário da equipe mostra a visita quando o status deixa de ser Solicitado.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação neste mês.' : ' solicitações neste mês.') + '</p><div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div></section>';
   }
   function pintarCal() {
     var box = document.getElementById('logcal');
@@ -650,6 +650,11 @@
   document.addEventListener('input', onInput);
   document.addEventListener('submit', onSubmit, true);
   document.addEventListener('click', onClick);
+  document.addEventListener('click', function (e) {
+    var dia = e.target.closest && e.target.closest('#logcal .cd[data-agd]');
+    if (!dia || e.target.closest('button,a,[data-bk]')) return;
+    if (typeof window.abrirAg === 'function') window.abrirAg(dia.dataset.agd, '', '');
+  });
   if (!document.getElementById('log-css')) {
     var s = document.createElement('style');
     s.id = 'log-css';
