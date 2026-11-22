@@ -111,6 +111,37 @@ function texto(v: unknown, max: number) {
   return String(v ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max);
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const REMETENTE = "Mediação Cultural Sesc <onboarding@resend.dev>";
+
+function emailOk(s: string) {
+  return EMAIL.test(s) && s.length <= 120;
+}
+
+function html(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] || c));
+}
+
+function lgpdOk(v: unknown) {
+  return v === true || v === "true" || v === "sim" || v === "1";
+}
+
+async function enviarEmail(key: string, de: string, para: string, assunto: string, corpo: string) {
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: de, to: [para], subject: assunto, html: corpo }),
+  });
+  if (r.ok) return "";
+  let msg = "O envio do e-mail foi recusado.";
+  try {
+    const j = await r.json();
+    const t = typeof j?.message === "string" ? j.message : "";
+    if (t) msg = t.slice(0, 180);
+  } catch { /* a resposta do Resend veio sem texto */ }
+  return msg;
+}
+
 function visitaDe(id: string, d: Record<string, unknown>): Visita | null {
   const data = texto(d.data, 10);
   const hora = texto(d.hora, 5);
@@ -403,7 +434,10 @@ Deno.serve(async (req) => {
   }
 
   const escola = texto(body.escola, 160);
+  const email = texto(body.email, 120).toLowerCase();
   if (escola.length < 2) return json({ error: "Informe a escola ou o grupo." }, 400);
+  if (!emailOk(email)) return json({ error: "Informe um e-mail válido." }, 400);
+  if (!lgpdOk(body.lgpd)) return json({ error: "Autorize a política de privacidade para enviar a solicitação." }, 400);
   if (transporte === "Ônibus do Sesc" && !enderecos.length) return json({ error: "Informe o endereço de embarque." }, 400);
   if (!resultado.ok && !resultado.pendente) {
     return json({ error: resultado.motivo || "O ônibus não chega a tempo neste horário.", alternativas }, 409);
@@ -420,12 +454,14 @@ Deno.serve(async (req) => {
     serie: texto(body.serie, 80),
     resp: texto(body.resp, 120),
     contato: texto(body.contato, 40),
+    email,
     pcd: texto(body.pcd, 200),
     transporte,
     obs: texto(body.obs, 2000),
     status: "Solicitado",
     origem: "instituicao",
     ts: Date.now(),
+    lgpdAceite: new Date().toISOString(),
     enderecos: transporte === "Ônibus do Sesc" ? enderecos : [],
     embarques: resultado.embarques,
     embOrigem: resultado.embOrigem,
@@ -438,6 +474,40 @@ Deno.serve(async (req) => {
   };
   const { error } = await admin.from("docs").insert({ path: "agendamentos", id, data: ficha });
   if (error) return json({ error: "Não foi possível enviar a solicitação. Tente de novo." }, 500);
+
+  let emailEnviado = false;
+  let emailAviso = "A solicitação foi registrada. O e-mail de confirmação não saiu agora.";
+  const { data: chaveEmail } = await admin.rpc("chave_resend");
+  const resend = typeof chaveEmail === "string" ? chaveEmail.trim() : "";
+  const { data: aviso } = await admin.rpc("aviso_visita");
+  const caixa = aviso && typeof aviso === "object" ? aviso as { email?: string; de?: string } : {};
+  const de = texto(caixa.de, 160) || REMETENTE;
+  const inbox = texto(caixa.email, 120).toLowerCase();
+  if (resend.length >= 20) {
+    const quando = dia.split("-").reverse().join("/") + " às " + hora;
+    const falha = await enviarEmail(
+      resend,
+      de,
+      email,
+      "Recebemos sua solicitação de agendamento — Sesc Piracicaba",
+      "<p>Recebemos a solicitação de agendamento de <b>" + html(escola) + "</b> para " + html(quando) + ".</p><p><b>Aguarde a confirmação da sua visita.</b> Este envio ainda não reserva o horário. A supervisão da mediação cultural analisa o pedido e confirma.</p>",
+    );
+    emailEnviado = !falha;
+    emailAviso = falha
+      ? "A solicitação foi registrada. O e-mail de confirmação não saiu: " + falha
+      : "Enviamos a confirmação de recebimento para " + email + ". Aguarde a confirmação da visita.";
+    if (emailOk(inbox)) {
+      await enviarEmail(
+        resend,
+        de,
+        inbox,
+        "Nova solicitação de agendamento — " + escola,
+        "<p>Chegou uma solicitação com status <b>Solicitado</b>. Ela ainda não está no calendário da equipe.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
+      );
+    }
+  } else {
+    emailAviso = "A solicitação foi registrada. O envio de e-mail ainda não está ativo.";
+  }
   return json({
     id,
     pendente: resultado.pendente,
@@ -447,5 +517,7 @@ Deno.serve(async (req) => {
     embSesc: resultado.embSesc,
     fim: resultado.fim,
     duracao: resultado.duracao,
+    emailEnviado,
+    emailAviso,
   });
 });

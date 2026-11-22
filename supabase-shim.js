@@ -308,6 +308,22 @@
     if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão ativa o mapa'); e.code = 'not_granted'; throw e; }
     await ok(sb.rpc('definir_chave_mapa', { p_chave: String(chave || '').trim() }));
   };
+  window.painelSalvarChaveResend = async function (chave) {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão ativa o e-mail'); e.code = 'not_granted'; throw e; }
+    await ok(sb.rpc('definir_chave_resend', { p_chave: String(chave || '').trim() }));
+  };
+  window.painelSalvarAvisoVisita = async function (email, de) {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') { var e = new Error('Somente a supervisão define o e-mail'); e.code = 'not_granted'; throw e; }
+    await ok(sb.rpc('definir_aviso_visita', { p_email: String(email || '').trim(), p_de: String(de || '').trim() }));
+  };
+  window.painelAvisoVisita = async function () {
+    await ready;
+    if (!ME || ME.role !== 'supervisao') return { email: '', de: '' };
+    var r = await ok(sb.rpc('aviso_visita'));
+    return r.data || { email: '', de: '' };
+  };
   window.painelLogistica = async function (body) {
     await ready;
     var session = (await sb.auth.getSession()).data.session;
