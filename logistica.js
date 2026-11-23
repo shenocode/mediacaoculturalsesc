@@ -301,6 +301,7 @@
       return String(v.data || '').indexOf(prefix) === 0 && v.status !== 'Cancelado';
     });
     var sol = visitas.filter(function (v) { return v.status === 'Solicitado'; }).length;
+    var marcadas = visitas.length - sol;
     var nome = mesCal.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     var cells = '';
     var i;
@@ -311,11 +312,11 @@
         return String(a.hora || '').localeCompare(String(b.hora || ''));
       }).map(function (v) {
         var pedido = v.status === 'Solicitado';
-        return '<button type=button class="ch ' + (pedido ? 'logsol' : 'a') + '" data-bk="' + esc(v.id) + '">' + esc((v.hora ? v.hora + ' ' : '') + (v.escola || 'Grupo')) + '</button>';
+        return '<button type=button class="logchip ' + (pedido ? 'logsol' : 'logfeito') + '" data-bk="' + esc(v.id) + '">' + esc((v.hora ? v.hora + ' ' : '') + (v.escola || 'Grupo')) + '</button>';
       }).join('');
       cells += '<div class="cd' + (k === hoje ? ' today' : '') + '" data-agd="' + k + '" title="Clique para agendar neste dia"><b>' + d + '</b>' + chips + '</div>';
     }
-    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>Clique num dia para abrir o agendamento já com essa data. Clique numa visita para abrir a ficha dela. O tracejado é um pedido aguardando confirmação e fica nesta aba. O Calendário da equipe mostra a visita quando o status deixa de ser Solicitado.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação neste mês.' : ' solicitações neste mês.') + '</p><div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div></section>';
+    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>Clique num dia para abrir o agendamento já com essa data. Clique numa visita para abrir a ficha dela. O tracejado é um pedido ainda sem confirmação. A cor clara é o que já está programado: agendado, confirmado ou a conferir.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação' : ' solicitações') + ' · ' + marcadas + (marcadas === 1 ? ' já programada.' : ' já programadas.') + '</p><div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div></section>';
   }
   function pintarCal() {
     var box = document.getElementById('logcal');
@@ -658,7 +659,7 @@
   if (!document.getElementById('log-css')) {
     var s = document.createElement('style');
     s.id = 'log-css';
-    s.textContent = '.vpub{max-width:760px;margin:0 auto}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .ch{cursor:pointer;text-align:left}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
+    s.textContent = '.vpub{max-width:760px;margin:0 auto}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .logchip{display:block;width:100%;margin-top:2px;padding:1px 4px;border-radius:4px;font:700 11px Nunito,sans-serif;line-height:1.2;text-align:left;white-space:normal;cursor:pointer}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}#logcal .logfeito{background:#f6e4e4;color:#7a3030;border:1.5px solid #e4c4c4}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
     document.head.appendChild(s);
   }
 
