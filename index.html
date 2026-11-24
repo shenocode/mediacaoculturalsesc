@@ -256,7 +256,7 @@ function typing(root){if(!root)return false;const a=document.activeElement;if(a&
 let BKD=null,OND='';
 function formDump(f){if(!f)return null;const o={};[...f.elements].forEach(el=>{if(!el.name||el.type=='file')return;if(el.type=='checkbox'){if(el.checked)(o[el.name]=o[el.name]||[]).push(el.value)}else if(el.type!='radio'||el.checked)o[el.name]=el.value});return o}
 function formFill(f,o){if(!f||!o)return;Object.entries(o).forEach(([k,v])=>{const els=[...f.elements].filter(e=>e.name==k);if(!els.length)return;if(els[0].type=='checkbox')els.forEach(e=>{e.checked=[].concat(v).includes(e.value)});else els[0].value=v})}
-function uiSave(){try{const mu=$('#muf');sessionStorage.setItem('painel-ui',JSON.stringify({tab:typeof CUR!=='undefined'?CUR:'',np:typeof NP!=='undefined'?NP:null,bk:typeof BK!=='undefined'?BK:null,open:typeof OPEN!=='undefined'?OPEN:null,io:typeof IO!=='undefined'?IO:null,ie:typeof IE!=='undefined'?IE:0,cadk:typeof CADK!=='undefined'?CADK:null,resk:typeof RESK!=='undefined'?RESK:null,y:scrollY,bkf:formDump($('#bkf')),on:($('#on-txt')||{}).value||'',mu:!!mu,mut:mu&&mu.elements.t?mu.elements.t.value:''}))}catch(e){}}
+function uiSave(){try{const mu=$('#muf');sessionStorage.setItem('painel-ui',JSON.stringify({tab:typeof CUR!=='undefined'?CUR:'',np:typeof NP!=='undefined'?NP:null,bk:typeof BK!=='undefined'?BK:null,open:typeof OPEN!=='undefined'?OPEN:null,io:typeof IO!=='undefined'?IO:null,ie:typeof IE!=='undefined'?IE:0,cadk:typeof CADK!=='undefined'?CADK:null,resk:typeof RESK!=='undefined'?RESK:null,semid:typeof SEMID!=='undefined'?SEMID:null,y:scrollY,bkf:formDump($('#bkf')),on:($('#on-txt')||{}).value||'',mu:!!mu,mut:mu&&mu.elements.t?mu.elements.t.value:''}))}catch(e){}}
 let uiT=0;function uiSoon(){clearTimeout(uiT);uiT=setTimeout(uiSave,250)}
 addEventListener('input',uiSoon);addEventListener('change',uiSoon);addEventListener('pagehide',uiSave);
 const safe=u=>/^(https?:\/\/|\/|data:image\/(jpeg|png|webp);base64,)/.test(u||'')?u:'#',uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -336,7 +336,7 @@ function pausaDraft(el){const keys=['hora','min','sab','sabHora','sabMin','dom',
 function drawPausa(force){const el=$('#l-pausa');if(!el||(!force&&(typing(el)||[...el.querySelectorAll('form[data-c=pausa] select')].some(s=>s.value!==(s.dataset.def||'')))))return;const draft=pausaDraft(el),rank=f=>({Supervisão:0,Coordenação:1,Gestão:2}[f]??5),people=[...(S.equipe||[])].sort((a,b)=>rank(a.funcao)-rank(b.funcao)||String(a.nick||a.nome).localeCompare(String(b.nick||b.nome),'pt'));if(!people.length){el.innerHTML='<p class=mut>Cadastre a equipe em Cadastro da equipe. Cada pessoa, inclusive a supervisão, ganha um card aqui.</p>';return}
 const fim=(name,label,modo,hora,min)=>`<fieldset class=pslot><legend>${label}</legend><label>Neste dia<select name=${name} data-def="${esc(modo)}">${[['igual','Igual à semana'],['outro','Outro horário'],['off','Sem pausa']].map(([v,t])=>`<option value="${v}"${modo===v?' selected':''}>${t}</option>`).join('')}</select></label><div class=pwhen data-pwhen=${name}${modo==='outro'?'':' hidden'}><label>Início da pausa<input name=${name}Hora type=time data-def="${esc(hora)}" value="${esc(hora)}"></label><label>Duração (min)<input name=${name}Min type=number min=5 max=240 step=5 inputmode=numeric placeholder="ex.: 40" data-def="${esc(min)}" value="${esc(min)}"></label></div><p class=pprev data-pprev=${name}></p></fieldset>`;
 el.innerHTML=`<div class=pgrid>${people.map(m=>{const p=pausaDe(m.nome),d=draft[nm(m.nome)]||{},pick=(k,fb)=>d[k]!=null?d[k]:fb,hora=pick('hora',p?p.hora:''),min=pick('min',p?String(+p.min||''):''),sab=pick('sab',pausaModo(p,'sab')),dom=pick('dom',pausaModo(p,'dom')),sabHora=pick('sabHora',p&&p.sabHora||''),sabMin=pick('sabMin',p&&p.sabMin?String(+p.sabMin||''):''),domHora=pick('domHora',p&&p.domHora||''),domMin=pick('domMin',p&&p.domMin?String(+p.domMin||''):''),faixa=pausaFaixa(hora,min);return `<article class=pcard><div class=who>${AV(m,'sm')}<div><b>${esc(m.nick||m.nome)}</b><span class=mut>${esc(m.funcao||'Equipe')}${m.nick&&nm(m.nick)!=nm(m.nome)?` · ${esc(m.nome)}`:''}</span></div></div><form class=pform data-c=pausa><input type=hidden name=pessoa value="${esc(m.nome)}"><fieldset class=pslot><legend>Segunda a sexta</legend><label>Início da pausa<input name=hora type=time data-def="${esc(hora)}" value="${esc(hora)}"></label><label>Duração (min)<input name=min type=number min=5 max=240 step=5 inputmode=numeric placeholder="ex.: 40" data-def="${esc(min)}" value="${esc(min)}"></label><p class=pprev data-pprev=semana>${faixa?esc(faixa)+' · seg a sex':'Defina o início e os minutos'}</p></fieldset>${fim('sab','Sábado',sab,sabHora,sabMin)}${fim('dom','Domingo',dom,domHora,domMin)}<div class=acts><button class=btn>Salvar</button>${p?`<button type=button class="btn g" data-pclr="${esc(m.nome)}">Limpar</button>`:''}</div></form></article>`}).join('')}</div>`;el.querySelectorAll('form[data-c=pausa]').forEach(syncPausaForm)}
-function show(t){capFechar();if(SOVIS){CUR='visita';const n=$('#nav');if(n){n.innerHTML='';n.hidden=true}$('#main').innerHTML='<div id=visita-pub></div>';if(window.LOG)LOG.bootPublico();if(location.hash)history.replaceState(null,'',location.pathname+location.search);return}if(SOGAL)t='galeria';BK=null;bkM();AGN=null;agM();if(!TABS[t]||t=='painel')t='home';if(!isEd&&['escala','estudos','notas'].includes(t))t='home';if(SOGAL)t='galeria';if(t=='trilhas'){TRO=true;t='obras'}else if(t!='obras')TRO=false;OPEN=null;modal();IO=null;IE=0;imodal();CADK=null;RESK=null;RESID=null;if(t!='caderno'){PREV='';PRED=''}CUR=t;try{ROOM&&ROOM.presence({tab:t})}catch(e){}NP=GR.sup.items.some(i=>i[0]==t)&&isEd?'sup':null;navR();if(SOGAL){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}else location.hash=t;
+function show(t){capFechar();if(SOVIS){CUR='visita';const n=$('#nav');if(n){n.innerHTML='';n.hidden=true}$('#main').innerHTML='<div id=visita-pub></div>';if(window.LOG)LOG.bootPublico();if(location.hash)history.replaceState(null,'',location.pathname+location.search);return}if(SOGAL)t='galeria';BK=null;bkM();AGN=null;agM();if(!TABS[t]||t=='painel')t='home';if(!isEd&&['escala','estudos','notas'].includes(t))t='home';if(SOGAL)t='galeria';if(t=='trilhas'){TRO=true;t='obras'}else if(t!='obras')TRO=false;OPEN=null;modal();IO=null;IE=0;imodal();CADK=null;RESK=null;RESID=null;SEMID=null;if(t!='caderno'){PREV='';PRED=''}CUR=t;try{ROOM&&ROOM.presence({tab:t})}catch(e){}NP=GR.sup.items.some(i=>i[0]==t)&&isEd?'sup':null;navR();if(SOGAL){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}else location.hash=t;
 $('#main').innerHTML=t=='home'?'<div id=home></div>':t=='painel'?'<div id="dash"></div>':t=='calendario'?'<div id="cal"></div>':t=='time'?'<div id=team></div>':t=='ideias'?`<div class="card"><div class=calbar style="margin:0"><label>Filtrar por status<select id=fs><option value="">Todos</option>${['Rascunho','Nova','Para análise','Aprovada','Em piloto','Arquivada'].map(x=>`<option>${x}</option>`).join('')}</select></label><label class=chk><input type=checkbox id=fm> Só as minhas oficinas</label>${isEd?'<button class="btn g" id=ex>Baixar planilha (CSV)</button>':''}</div></div>`+IPAN():t=='obras'?OBAR()+`<div class=trlwrap><button type=button class=trlgo id=trlgo aria-expanded="${TRO?'true':'false'}" aria-controls=trilhas>🧭 Trilhas da Mediação</button><div id=trilhas ${TRO?'':'hidden'}></div></div>`+panel('obras'):t=='estudos'?pausaCard()+'<div id="cal"></div>':t=='jornada'?JORN():t=='galeria'?GALH():t=='cartas'?'<div id=cartas></div>':t=='caderno'?CADH():t=='notas'?REP():t=='escala'?panel('equipe'):TABS[t][1].map(panel).join('');
 TABS[t][1].forEach(draw);if(t=='home')drawH();if(t=='calendario')cal();if(t=='caderno')drawCad();if(t=='notas')relCadBoot();initMeds(document);if(t=='jornada')drawJ();if(t=='estudos')cal();if(t=='galeria')drawG();if(t=='cartas')drawC(true);if(t=='obras'&&TRO)drawTr();if(t=='time')drawT();people();uiSave()}
 function people(){let d=$('#pessoas');if(!d){d=document.createElement('datalist');d.id='pessoas';document.body.append(d)}d.innerHTML=(S.equipe||[]).map(p=>`<option value="${esc(p.nick||p.nome)}" label="${esc(p.nome)}">`).join('')}
@@ -978,13 +978,46 @@ function relCadQuando(ts){
  const n=+ts||0;if(!n)return '';
  try{return new Date(n).toLocaleString('pt-BR')}catch(e){return ''}
 }
-function relCadHTML(itens,titulo,oculto){
- const rows=(itens||[]).map(m=>{
-  const tx=String(m.texto||'').trim();
-  const quando=relCadQuando(m.ts);
-  return '<article class=rcad><h3>'+esc(m.nome||'(sem nome)')+'</h3>'
-   +(quando?'<p class=mut>Atualizado em '+esc(quando)+'</p>':'')
-   +'<div class="rcad-txt'+(tx?'':' vazio')+'">'+(tx?relHtmlTexto(tx):'Sem anotações neste caderno.')+'</div></article>';
+function relCadDia(ts){
+ const n=+ts||0;if(!n)return '';
+ try{return new Date(n).toLocaleDateString('pt-BR')}catch(e){return ''}
+}
+function relCadBounds(f,t){
+ const de=f?new Date(f+'T00:00:00').getTime():0;
+ const ate=t?new Date(t+'T23:59:59.999').getTime():Number.MAX_SAFE_INTEGER;
+ return {de:isFinite(de)?de:0,ate:isFinite(ate)?ate:Number.MAX_SAFE_INTEGER};
+}
+function relCadNoPeriodo(itens,f,t){
+ const b=relCadBounds(f,t);
+ return (itens||[]).filter(m=>{
+  const n=+(m.criado||m.ts)||0;
+  if(!n)return true;
+  return n>=b.de&&n<=b.ate;
+ });
+}
+function relCadHTML(itens,titulo,oculto,f,t){
+ const b=relCadBounds(f,t),por={};
+ (itens||[]).forEach(m=>{
+  const k=String(m.owner||m.email||m.nome||'');
+  if(!por[k])por[k]={nome:m.nome||'(sem nome)',itens:[]};
+  por[k].itens.push(m);
+ });
+ const nomes=Object.keys(por).sort((a,b)=>String(por[a].nome).localeCompare(por[b].nome,'pt'));
+ const rows=nomes.map(k=>{
+  const g=por[k],ents=g.itens.filter(x=>{
+   if(!String(x.texto||'').trim())return false;
+   const n=+(x.criado||x.ts)||0;
+   if(!n)return true;
+   return n>=b.de&&n<=b.ate;
+  }).sort((a,b)=>(+(b.criado||b.ts)||0)-(+(a.criado||a.ts)||0));
+  if(!ents.length)return '<article class=rcad><h3>'+esc(g.nome)+'</h3><div class="rcad-txt vazio">Sem anotações neste período.</div></article>';
+  return ents.map(m=>{
+   const quando=relCadDia(m.criado||m.ts)||relCadQuando(m.ts);
+   const tit=m.titulo||'Estudos da Semana';
+   return '<article class=rcad><h3>'+esc(g.nome)+(quando?' · '+esc(quando):'')+'</h3>'
+    +(tit?'<p class=mut>'+esc(tit)+'</p>':'')
+    +'<div class="rcad-txt">'+relHtmlTexto(m.texto)+'</div></article>';
+  }).join('');
  }).join('');
  const corpo=rows||'<p class=mut>Nenhum membro com acesso encontrado.</p>';
  return '<section data-sec=cad'+(oculto?' hidden':'')+'><h2 contenteditable="true" data-field=tit-cad>'+esc(titulo||REL_TIT['tit-cad'])+'</h2>'+corpo+'</section>';
@@ -993,7 +1026,7 @@ async function relCadCarregar(force){
  if(!isEd||!user||!user.resumoCadernosSemana){REL_CAD=[];return []}
  if(!force&&REL_CAD&&REL_CAD.length)return REL_CAD;
  const rows=await user.resumoCadernosSemana();
- REL_CAD=(rows||[]).map(r=>({owner:r.owner,nome:r.nome||'',email:r.email||'',texto:r.texto||'',ts:r.ts||0}));
+ REL_CAD=(rows||[]).map(r=>({owner:r.owner,nome:r.nome||'',email:r.email||'',texto:r.texto||'',ts:r.ts||0,criado:r.criado||r.ts||0,titulo:r.titulo||'',entry_id:r.entry_id||null}));
  return REL_CAD;
 }
 async function relCadBoot(){
@@ -1014,13 +1047,13 @@ function relDocInner(f,t,campos,charts,vis){
   +relTabelaHTML('esp',f,t,campos.titEsp,all,map,!!(vis&&!vis.esp))
   +relBlocoTexto('livre',campos.livre,'Texto livre antes dos gráficos. Entra no PDF quando você escrever.')
   +'<section data-sec=graf'+(pies.length?'':' hidden')+'><h2 contenteditable="true" data-field=tit-graf>'+esc(campos.titGraf||REL_TIT['tit-graf'])+'</h2><div class=pies>'+pies.map(relPieHTML).join('')+'</div></section>'
-  +relCadHTML(cadItens,campos.titCad,!(vis&&vis.cad));
+  +relCadHTML(cadItens,campos.titCad,!(vis&&vis.cad),f,t);
 }
 function relCompHTML(ui,f,t){
  const charts=ui.charts||{};
  const gOn=ui.showGrp==null||!!ui.showGrp,eOn=ui.showEsp==null||!!ui.showEsp,cOn=!!ui.showCad;
  const boxes=REL_GRAF.map(g=>'<label><input type=checkbox data-rchart="'+g.id+'" '+(charts[g.id]?'checked':'')+'><span>'+esc(g.label)+'</span></label>').join('');
- return '<div class=rcomp><div class=rcomp-h><b>O que entra neste relatório</b></div><p class=d>As duas tabelas já vêm marcadas. Cada uma lista data, dia da semana, pessoas e observação. Os gráficos ficam à parte e saem depois das tabelas. O caderno de estudos da semana traz o texto atual de cada membro.</p><div class=rcomp-ops><label><input type=checkbox id=rgrp '+(gOn?'checked':'')+'><span>Visitas de grupos/agendamentos<small>Soma das pessoas nos agendamentos realizados</small></span></label><label><input type=checkbox id=resp '+(eOn?'checked':'')+'><span>Ativações livres do educativo<small>Números lançados na tabela de cima</small></span></label><label><input type=checkbox id=rcad '+(cOn?'checked':'')+'><span>Resumo caderno de estudos da semana (todos os membros)<small>Texto atual do caderno Estudos da Semana de cada pessoa</small></span></label></div><div class=rcomp-g><b>Gráficos</b><div class=rcomp-ops>'+boxes+'</div><p class=d id=rel-graf-hint>'+esc(relHintTexto(f,t,charts))+'</p></div></div>';
+ return '<div class=rcomp><div class=rcomp-h><b>O que entra neste relatório</b></div><p class=d>As duas tabelas já vêm marcadas. Cada uma lista data, dia da semana, pessoas e observação. Os gráficos ficam à parte e saem depois das tabelas. O caderno de estudos da semana traz as anotações salvas de cada membro no período.</p><div class=rcomp-ops><label><input type=checkbox id=rgrp '+(gOn?'checked':'')+'><span>Visitas de grupos/agendamentos<small>Soma das pessoas nos agendamentos realizados</small></span></label><label><input type=checkbox id=resp '+(eOn?'checked':'')+'><span>Ativações livres do educativo<small>Números lançados na tabela de cima</small></span></label><label><input type=checkbox id=rcad '+(cOn?'checked':'')+'><span>Resumo caderno de estudos da semana (todos os membros)<small>Anotações salvas no caderno Estudos da Semana no período</small></span></label></div><div class=rcomp-g><b>Gráficos</b><div class=rcomp-ops>'+boxes+'</div><p class=d id=rel-graf-hint>'+esc(relHintTexto(f,t,charts))+'</p></div></div>';
 }
 function relVisDoUI(ui){
  return {grp:ui.showGrp==null||!!ui.showGrp,esp:ui.showEsp==null||!!ui.showEsp,cad:!!ui.showCad,cadItens:REL_CAD};
@@ -1162,15 +1195,17 @@ function relSnapshot(){
  });
  let totGrp=0,totEsp=0;
  Object.keys(dias).forEach(d=>{totGrp+=dias[d].grp;totEsp+=dias[d].esp});
- const cadernos=showCad?(REL_CAD||[]).map(m=>({owner:m.owner,nome:m.nome||'',email:m.email||'',texto:m.texto||'',ts:m.ts||0})):[];
+ const cadAll=showCad?(REL_CAD||[]).map(m=>({owner:m.owner,nome:m.nome||'',email:m.email||'',texto:m.texto||'',ts:m.ts||0,criado:m.criado||m.ts||0,titulo:m.titulo||'',entry_id:m.entry_id||null})):[];
+ const cadernos=showCad?relCadNoPeriodo(cadAll,p.f,p.t):[];
  const totCad=cadernos.filter(m=>String(m.texto||'').trim()).length;
- return Object.assign({de:p.f,ate:p.t,showGrp,showEsp,showCad,charts,dias,totGrp,totEsp,cadernos,totCad},campos);
+ const membrosCad=new Set(cadernos.map(m=>String(m.owner||m.email||m.nome||''))).size;
+ return Object.assign({de:p.f,ate:p.t,showGrp,showEsp,showCad,charts,dias,totGrp,totEsp,cadernos,totCad,membrosCad},campos);
 }
 function relResumo(snap){
  const partes=[];
  if(snap.showGrp!==0)partes.push('Visitas de grupos/agendamentos: '+snap.totGrp+' pessoas');
  if(snap.showEsp!==0)partes.push('Ativações livres do educativo: '+snap.totEsp+' pessoas');
- if(snap.showCad)partes.push('Caderno Estudos da Semana: '+(snap.totCad||0)+' com anotações'+(snap.cadernos&&snap.cadernos.length?' de '+snap.cadernos.length+' membros':''));
+ if(snap.showCad)partes.push('Caderno Estudos da Semana: '+(snap.totCad||0)+' anotações'+(snap.membrosCad?' de '+snap.membrosCad+' membros':''));
  return partes.join('. ')+(partes.length?'.':'');
 }
 function relSalvos(){return (S.notas||[]).filter(x=>x.tipo==='Relatório semanal').sort((a,b)=>(b.ts||0)-(a.ts||0))}
@@ -1186,7 +1221,7 @@ function relAbrirPrep(i){
  if($('#rgrp'))$('#rgrp').checked=r.showGrp!==0;
  if($('#resp'))$('#resp').checked=r.showEsp!==0;
  if($('#rcad'))$('#rcad').checked=!!r.showCad;
- REL_CAD=Array.isArray(r.cadernos)?r.cadernos.map(m=>({owner:m.owner,nome:m.nome||'',email:m.email||'',texto:m.texto||'',ts:m.ts||0})):[];
+ REL_CAD=Array.isArray(r.cadernos)?r.cadernos.map(m=>({owner:m.owner,nome:m.nome||'',email:m.email||'',texto:m.texto||'',ts:m.ts||0,criado:m.criado||m.ts||0,titulo:m.titulo||'',entry_id:m.entry_id||null})):[];
  const charts=r.charts||{};
  document.querySelectorAll('[data-rchart]').forEach(el=>{el.checked=!!charts[el.dataset.rchart]});
  if(f&&t&&f<=t){
@@ -1765,23 +1800,85 @@ document.addEventListener('submit',async e=>{const f=e.target.closest('#idf-part
 d.status=ofStatusSave(part,d.status);
 try{toast('Enviando…');const capa=await capaDoForm(f);if(capa==null)return;if(capa)d.capa=capa;const avis=d.status=='Rascunho'?'Rascunho salvo. Só você e a supervisão veem.':d.status=='Para análise'?'Salvo. Toda a equipe pode ver esta oficina.':(part?'Oficina salva!':'Proposta enviada!');if(f.id!='ief'){await db.collection('ideias').doc(uid()).set({capa:'',...d,uid:MY,ts:Date.now()});f.reset();capPreview(f,'');f.querySelectorAll('[data-meds]').forEach(b=>{b.dataset.init='';b.dataset.sel=''});initMeds(f);toast(avis)}else{await db.collection('ideias').doc(IO).update(d);IE=0;const m=$('#im');if(m)m.dataset.id='';imodal();toast(avis)}}catch(er){toast(ER(er))}});
 /* cadernos privados */
-let CADK=null,CT2,RESK=null,RESID=null,CADL=0,MEN='';
+let CADK=null,CT2,RESK=null,RESID=null,SEMID=null,CADL=0,MEN='';
 const CK={semana:[CAD_SEMANA,'📖','Estudos da Semana'],estudos:['cad-estudos','📚','Estudos'],geral:['cad-geral','📝','Anotações gerais'],mediacao:['cad-mediacao','🧭','Experiências na mediação']};
-const CADH=()=>MY?`<section class=card><h3>Meus cadernos</h3><p class=d>Crie, renomeie ou exclua cadernos. Em cada um aberto, use Resumir e salve o texto. Os demais cadernos são só seus. O caderno <b>Estudos da Semana</b> a supervisão lê no relatório semanal.</p><div id=cadroot></div></section>`:'<div class=warn><b>Entre para usar os cadernos.</b><br>Cadernos, favoritas e anotações são pessoais. <button type=button class="btn" data-login=1>Entrar</button></div><div class=card style="margin-top:10px"><button class=btn type=button data-diag=1>🔎 Testar minha conexão</button><pre id=diag style="white-space:pre-wrap;font-size:13px;margin:10px 0 0"></pre></div>';
+const CADH=()=>MY?`<section class=card><h3>Meus cadernos</h3><p class=d>Crie, renomeie ou exclua cadernos. Em cada um aberto, use Resumir e salve o texto. Os demais cadernos são só seus. No <b>Estudos da Semana</b>, cada Salvar cria uma anotação datada na lista (a supervisão lê no relatório).</p><div id=cadroot></div></section>`:'<div class=warn><b>Entre para usar os cadernos.</b><br>Cadernos, favoritas e anotações são pessoais. <button type=button class="btn" data-login=1>Entrar</button></div><div class=card style="margin-top:10px"><button class=btn type=button data-diag=1>🔎 Testar minha conexão</button><pre id=diag style="white-space:pre-wrap;font-size:13px;margin:10px 0 0"></pre></div>';
 function cadRaw(id){const d=(S.cads||{})[id];if(d==null)return {};if(typeof d==='string')return {texto:d};return d}
 function cadResolve(k){if(!k)return null;return CK[k]?CK[k][0]:k}
 function cadKnown(k){const id=cadResolve(k);if(!id)return null;const base=Object.values(CK).find(x=>x[0]==id),d=cadRaw(id);if(d.apagado&&id!==CAD_SEMANA)return null;if(!base&&!(S.cads||{})[id])return null;const texto=id===CAD_SEMANA&&d.apagado?'':(d.texto||'');return {id,base:!!base,ic:d.icone||(base?base[1]:'📓'),titulo:d.titulo||(base?base[2]:'Caderno'),texto}}
 function cadAll(){const ids=Object.values(CK).map(x=>x[0]);Object.keys(S.cads||{}).forEach(id=>{if(!ids.includes(id))ids.push(id)});return ids.map(cadKnown).filter(Boolean)}
 function cadBody(id,extra){const prev=cadRaw(id),body={texto:extra.texto!=null?extra.texto:(prev.texto||''),ts:Date.now()};const titulo=extra.titulo!=null?extra.titulo:prev.titulo,icone=extra.icone!=null?extra.icone:prev.icone;if(titulo)body.titulo=titulo;if(icone)body.icone=icone;if(extra.apagado)body.apagado=1;return body}
 async function saveCad(id,extra){const body=cadBody(id,extra||{});S.cads=S.cads||{};S.cads[id]=body;await db.collection('data/users/'+MY).doc(id).set(body);return body}
+function semAll(){return [...(S.semanas||[])].sort((a,b)=>(+(b.criado||b.ts)||0)-(+(a.criado||a.ts)||0))}
+function semTituloData(ts){const n=+ts||Date.now();return 'Estudos da Semana · '+new Date(n).toLocaleDateString('pt-BR')}
+function semListaHTML(){
+ const a=semAll();
+ const itens=a.length?a.map(i=>{
+  const criado=i.criado||i.ts,quando=criado?new Date(criado).toLocaleDateString('pt-BR'):'';
+  const editado=i.ts&&i.criado&&i.ts!==i.criado?new Date(i.ts).toLocaleString('pt-BR'):'';
+  const clip=String(i.texto||'').replace(/\s+/g,' ').trim().slice(0,110);
+  const on=SEMID===i.id?' style="outline:2px solid var(--navy);outline-offset:2px"':'';
+  return `<div class=it${on}><div><b>${esc(i.titulo||semTituloData(criado))}</b><div class=mut>${esc(quando)}${editado?' · editado '+esc(editado):''}${clip?' · '+esc(clip):''}</div></div><div style="display:flex;gap:6px;align-items:center"><button type=button class="btn g cmini" data-sopen="${esc(i.id)}">Abrir</button><button type=button class="btn cmini" data-sdel="${esc(i.id)}">Excluir</button></div></div>`;
+ }).join(''):'<p class=mut>Nenhuma anotação na lista ainda. Escreva acima e use Salvar para guardar com a data de hoje.</p>';
+ return `<div id=semlista style="margin-top:16px"><h3 style="margin:0 0 6px">Minhas anotações de estudos</h3><p class=d>Cada vez que você salva, a anotação entra nesta lista com a data. Abra para consultar, editar e salvar de novo.</p>${itens}</div>`;
+}
+function semRefreshLista(){const box=$('#semlista');if(!box)return;const hold=document.createElement('div');hold.innerHTML=semListaHTML();box.replaceWith(hold.firstElementChild)}
+async function salvarSemanaLista(){
+ if(!MY||CADK!==CAD_SEMANA)return;
+ const ta=$('#cadta');if(!ta)return;
+ const texto=ta.value;if(!String(texto||'').trim())return toast('Escreva algo antes de salvar na lista');
+ const agora=Date.now();
+ const prev=SEMID?(S.semanas||[]).find(x=>x.id==SEMID):null;
+ const id=SEMID||('sem-'+uid());
+ const criado=prev&&prev.criado?prev.criado:agora;
+ const titulo=(prev&&prev.titulo)||semTituloData(criado);
+ const body={titulo,texto,ts:agora,criado,caderno:CAD_SEMANA};
+ const s1=$('#cads');if(s1)s1.textContent='Salvando…';
+ try{
+  clearTimeout(CT2);
+  await db.collection('data/users/'+MY).doc(id).set(body);
+  await saveCad(CAD_SEMANA,{texto});
+  SEMID=id;
+  S.semanas=(S.semanas||[]).filter(x=>x.id!=id);
+  S.semanas.push({id,...body});
+  const s2=$('#cads');if(s2)s2.textContent='Salvo ✓';
+  semRefreshLista();
+  uiSave();
+  toast(prev?'Anotação atualizada na lista':'Anotação salva na lista · '+new Date(criado).toLocaleDateString('pt-BR'));
+ }catch(er){if(s1)s1.textContent='';toast(ER(er))}
+}
+async function excluirSemana(id){
+ if(!MY||!await ask('Excluir esta anotação da lista?'))return;
+ try{
+  await db.collection('data/users/'+MY).doc(id).delete();
+  S.semanas=(S.semanas||[]).filter(x=>x.id!=id);
+  if(SEMID==id){SEMID=null;const ta=$('#cadta');if(ta)ta.value=(cadKnown(CAD_SEMANA)||{}).texto||'';const s=$('#cads');if(s)s.textContent=''}
+  if($('#semlista'))semRefreshLista();else drawCad();
+  toast('Anotação excluída');
+ }catch(er){toast(ER(er))}
+}
+function abrirSemana(id){
+ const it=(S.semanas||[]).find(x=>x.id==id);if(!it)return;
+ SEMID=id;CADK=CAD_SEMANA;RESK=null;RESID=null;
+ drawCad(1);uiSave();
+}
+async function novaSemanaAnotacao(){
+ if(CADK!==CAD_SEMANA)return;
+ const ta=$('#cadta');
+ if(ta&&String(ta.value||'').trim()&&SEMID&&!(await ask('Começar uma anotação nova? O texto aberto continua na lista se já estiver salvo.')))return;
+ SEMID=null;
+ if(ta){ta.value='';ta.focus()}
+ const s=$('#cads');if(s)s.textContent='Nova anotação';
+ semRefreshLista();uiSave();
+}
 function promptText(msg,val){return new Promise(ok=>{const o=document.createElement('div');o.className='mb';o.style.zIndex=50;o.innerHTML=`<div class=mc style="display:block;max-width:420px;padding:18px"><p style="margin:0 0 10px;font-weight:800;color:var(--navy)">${esc(msg)}</p><input id=ptx value="${esc(val||'')}"><div class=calbar style="margin:10px 0 0;justify-content:flex-end"><button type=button class="btn g" data-k=0>Cancelar</button><button type=button class=btn data-k=1>Continuar</button></div></div>`;const fim=k=>{const v=o.querySelector('#ptx').value;o.remove();ok(k?v:null)};o.addEventListener('click',e=>{const k=e.target.dataset?.k;if(k==='1')fim(1);else if(k==='0'||e.target===o)fim(0)});o.addEventListener('keydown',e=>{if(e.key=='Enter'){e.preventDefault();fim(1)}else if(e.key=='Escape')fim(0)});document.body.append(o);const inp=o.querySelector('#ptx');inp.focus();inp.select()})}
 function resumoTexto(it){const ls=String(it.texto||'').replace(/\r/g,'').split(/\n+/).map(x=>x.trim()).filter(Boolean);return ls.length?ls.map(l=>'- '+l).join('\n'):''}
 function resFields(titulo,texto,nome){return `<label>Título do resumo<input id=restit value="${esc(titulo||'')}"></label><textarea id=resta rows=14>${esc(texto||'')}</textarea><div class=calbar style="margin-top:8px"><label>Seu nome (aparece no PDF)<input id=resnome value="${esc(nome||'')}"></label><button type=button class=btn id=ressave>💾 Salvar resumo</button><button type=button class=btn id=respdf>⬇️ Baixar PDF</button><button type=button class="btn g" id=reswa>💬 WhatsApp</button></div><p class=mut>Salvar guarda este texto na lista. Abra de novo para consultar, editar e salvar. O WhatsApp não anexa o arquivo sozinho: o PDF é salvo e a conversa abre para você anexá-lo.</p>`}
 function resLista(){const a=[...(S.resumos||[])].sort((x,y)=>(y.ts||0)-(x.ts||0));const itens=a.length?a.map(i=>{const quando=i.ts?new Date(i.ts).toLocaleString('pt-BR'):'',clip=String(i.texto||'').replace(/\s+/g,' ').trim().slice(0,110);return `<div class=it><div><b>${esc(i.titulo||'Resumo')}</b><div class=mut>${esc(quando)}${clip?' · '+esc(clip):''}</div></div><div style="display:flex;gap:6px;align-items:center"><button type=button class="btn g cmini" data-ropen="${esc(i.id)}">Abrir</button><button type=button class="btn cmini" data-rdel="${esc(i.id)}">Excluir</button></div></div>`}).join(''):'<p class=mut>Nenhum resumo salvo. Abra um caderno e use Resumir.</p>';return `<h3 style="margin:18px 0 6px">Meus resumos</h3><p class=d>Cada resumo salvo fica nesta lista. Abra para consultar, editar o texto e salvar de novo.</p>${itens}`}
-function drawCad(){const el=$('#cadroot');if(!el)return;if(CADL&&CADK&&$('#cadta'))return;if(CADL&&RESK&&$('#resta')&&!$('#cadta'))return;if(!CADL){el.innerHTML=(CADK||RESK)?'<p class=mut>Carregando…</p>':favSec()+'<p class=mut>Carregando cadernos…</p>';return}
+function drawCad(force){const el=$('#cadroot');if(!el)return;if(!force&&CADL&&CADK&&$('#cadta'))return;if(!force&&CADL&&RESK&&$('#resta')&&!$('#cadta'))return;if(!CADL){el.innerHTML=(CADK||RESK)?'<p class=mut>Carregando…</p>':favSec()+'<p class=mut>Carregando cadernos…</p>';return}
 if(RESK){const r=(S.resumos||[]).find(x=>x.id==RESK);if(!r){RESK=null;RESID=null}else{el.innerHTML=`<div class=calbar><button type=button class="btn g" data-rb=1>◀ Cadernos</button><h3 style="flex:1;margin:0">Resumo salvo</h3><button type=button class=btn data-rdel="${esc(r.id)}">Excluir</button></div><section class=card style="margin-top:12px"><h3>Consultar e editar</h3><p class=d>Altere o título ou o texto e use Salvar resumo. A lista atualiza esta mesma cópia.</p>${resFields(r.titulo,r.texto,MEN)}</section>`;return}}
-if(CADK){const it=cadKnown(CADK);if(!it)CADK=null;else{const semana=it.id===CAD_SEMANA;el.innerHTML=`<div class=calbar><button type=button class="btn g" data-cb=1>◀ Cadernos</button><h3 id=cadtit style="flex:1;margin:0">${esc(it.ic)} ${esc(it.titulo)}</h3><span class=mut id=cads></span><button type=button class=btn data-csv=1>💾 Salvar</button><button type=button class="btn g" data-cren="${esc(it.id)}">Renomear</button>${semana?'':'<button type=button class=btn data-cax="'+esc(it.id)+'">Excluir</button>'}<button type=button class="btn g" data-cdl=1>Baixar .txt</button><button type=button class=btn data-res=1>📄 Resumir</button></div>${semana?'<p class=mut style="margin:0 0 8px">Este caderno entra no relatório semanal da supervisão.</p>':''}<textarea id=cadta rows=18 style="width:100%" placeholder="Escreva aqui. Suas anotações são salvas automaticamente.">${esc(it.texto)}</textarea><div id=resbox></div>`;return}}
-const cards=cadAll().map(it=>{const semana=it.id===CAD_SEMANA;const sub=semana?(it.texto.trim()?'Abrir · visível à supervisão':'Começar · visível à supervisão'):(it.texto.trim()?'Abrir caderno':'Começar');const bar=semana?`<div class=cbar><button type=button class="btn g cmini" data-cren="${esc(it.id)}">Renomear</button></div>`:`<div class=cbar><button type=button class="btn g cmini" data-cren="${esc(it.id)}">Renomear</button><button type=button class="btn cmini" data-cax="${esc(it.id)}">Excluir</button></div>`;return `<div class="jc ic"><button type=button class=copen data-ck="${esc(it.id)}"><div class=jt><div class=jph style="background:var(--navy)">${esc(it.ic)}</div></div><div class=jn>${esc(it.titulo)}</div><div class=jp>${esc(sub)}</div></button>${bar}</div>`}).join('');
+if(CADK){const it=cadKnown(CADK);if(!it)CADK=null;else{const semana=it.id===CAD_SEMANA;const entr=semana&&SEMID?(S.semanas||[]).find(x=>x.id==SEMID):null;if(semana&&SEMID&&!entr)SEMID=null;const texto=entr?entr.texto:(it.texto||'');const subt=semana?(entr?'Anotação de '+(entr.criado?new Date(entr.criado).toLocaleDateString('pt-BR'):'…')+' — edite e salve para atualizar a lista.':'Escreva o estudo da semana e use Salvar para guardar na lista com a data de hoje. A supervisão lê essas anotações no relatório.'):'';el.innerHTML=`<div class=calbar><button type=button class="btn g" data-cb=1>◀ Cadernos</button><h3 id=cadtit style="flex:1;margin:0">${esc(it.ic)} ${esc(entr?entr.titulo:it.titulo)}</h3><span class=mut id=cads></span><button type=button class=btn data-csv=1>💾 Salvar</button>${semana?'<button type=button class="btn g" data-snew=1>＋ Nova anotação</button>':''}<button type=button class="btn g" data-cren="${esc(it.id)}">Renomear</button>${semana?'':'<button type=button class=btn data-cax="'+esc(it.id)+'">Excluir</button>'}<button type=button class="btn g" data-cdl=1>Baixar .txt</button><button type=button class=btn data-res=1>📄 Resumir</button></div>${subt?'<p class=mut style="margin:0 0 8px">'+esc(subt)+'</p>':''}<textarea id=cadta rows=18 style="width:100%" placeholder="${semana?'Escreva o estudo desta semana…':'Escreva aqui. Suas anotações são salvas automaticamente.'}">${esc(texto)}</textarea>${semana?semListaHTML():'<div id=resbox></div>'}`;return}}
+const cards=cadAll().map(it=>{const semana=it.id===CAD_SEMANA;const nSem=semana?semAll().length:0;const sub=semana?(nSem?(nSem===1?'1 anotação na lista':nSem+' anotações na lista'):'Começar · salve para criar a lista'):(it.texto.trim()?'Abrir caderno':'Começar');const bar=semana?`<div class=cbar><button type=button class="btn g cmini" data-cren="${esc(it.id)}">Renomear</button></div>`:`<div class=cbar><button type=button class="btn g cmini" data-cren="${esc(it.id)}">Renomear</button><button type=button class="btn cmini" data-cax="${esc(it.id)}">Excluir</button></div>`;return `<div class="jc ic"><button type=button class=copen data-ck="${esc(it.id)}"><div class=jt><div class=jph style="background:var(--navy)">${esc(it.ic)}</div></div><div class=jn>${esc(it.titulo)}</div><div class=jp>${esc(sub)}</div></button>${bar}</div>`}).join('');
 el.innerHTML=favSec()+`<div class=calbar><button type=button class=btn data-cnew=1>＋ Novo caderno</button><span class=mut>Estudos da Semana é lido pela supervisão; os outros são só seus.</span></div><div class=jg>${cards}</div>${resLista()}`}
 async function renomearCad(id){const it=cadKnown(id);if(!it||!MY)return;const nome=await promptText('Nome do caderno',it.titulo);if(nome==null)return;const t=nome.trim();if(!t)return toast('O nome não pode ficar vazio');const extra={titulo:t};if($('#cadta')&&CADK==it.id)extra.texto=$('#cadta').value;try{clearTimeout(CT2);await saveCad(it.id,extra);const h=$('#cadtit');if(h)h.textContent=it.ic+' '+t;if(!$('#cadta'))drawCad();toast('Caderno renomeado')}catch(er){toast(ER(er))}}
 async function excluirCad(id){const it=cadKnown(id);if(!it||!MY)return;if(it.id===CAD_SEMANA)return toast('O caderno Estudos da Semana fica para toda a equipe e não pode ser excluído.');if(!await ask('Excluir o caderno “'+it.titulo+'”? As anotações dele também saem.'))return;try{clearTimeout(CT2);if(it.base)await saveCad(it.id,{apagado:1,texto:''});else{await db.collection('data/users/'+MY).doc(it.id).delete();delete (S.cads||{})[it.id]}if(CADK==it.id)CADK=null;drawCad();toast('Caderno excluído')}catch(er){toast(ER(er))}}
@@ -1802,21 +1899,24 @@ const dl=await window.claude?.use('downloads');if(dl)await dl.save({filename:fn,
 window.open('https://wa.me/'+(num||'')+'?text='+encodeURIComponent('Olá! Estou te enviando o resumo das minhas anotações de mediação (PDF em anexo).'),'_blank','noopener');toast('Anexe o PDF salvo na conversa')}
 else{const dl=await window.claude?.use('downloads');if(!dl){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();return}await dl.save({filename:fn,data:blob})}}
 catch(er){toast(er&&er.code=='declined'?'Cancelado':'Não foi possível gerar o PDF')}}
-document.addEventListener('input',e=>{if(e.target.id!='cadta'||!MY||!CADK)return;clearTimeout(CT2);const id=CADK,v=e.target.value,s=$('#cads');if(s)s.textContent='Salvando…';CT2=setTimeout(async()=>{try{await saveCad(id,{texto:v});const s2=$('#cads');if(s2&&CADK==id)s2.textContent='Salvo ✓'}catch(er){toast(ER(er))}},900)});
-document.addEventListener('click',async e=>{const t=e.target.closest('[data-cnew],[data-cren],[data-cax],[data-ck],[data-cb],[data-cdl],[data-csv],[data-res],[data-ropen],[data-rb],[data-rdel],#ressave,#respdf,#reswa');if(!t)return;
+document.addEventListener('input',e=>{if(e.target.id!='cadta'||!MY||!CADK)return;clearTimeout(CT2);const id=CADK,v=e.target.value,s=$('#cads');if(s)s.textContent='Salvando…';CT2=setTimeout(async()=>{try{if(id===CAD_SEMANA&&SEMID){const prev=(S.semanas||[]).find(x=>x.id==SEMID)||{};const body={titulo:prev.titulo||semTituloData(prev.criado||Date.now()),texto:v,ts:Date.now(),criado:prev.criado||Date.now(),caderno:CAD_SEMANA};await db.collection('data/users/'+MY).doc(SEMID).set(body);S.semanas=(S.semanas||[]).filter(x=>x.id!=SEMID);S.semanas.push({id:SEMID,...body});await saveCad(CAD_SEMANA,{texto:v})}else await saveCad(id,{texto:v});const s2=$('#cads');if(s2&&CADK==id)s2.textContent='Salvo ✓'}catch(er){toast(ER(er))}},900)});
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-cnew],[data-cren],[data-cax],[data-ck],[data-cb],[data-cdl],[data-csv],[data-res],[data-ropen],[data-rb],[data-rdel],[data-sopen],[data-sdel],[data-snew],#ressave,#respdf,#reswa');if(!t)return;
 if(t.id=='ressave')return salvarResumo();
 if(t.id=='respdf')return enviarResumo('pdf');
 if(t.id=='reswa')return enviarResumo('wa');
-if(t.dataset.ropen){RESK=t.dataset.ropen;RESID=RESK;CADK=null;drawCad();uiSave();return}
+if(t.dataset.ropen){RESK=t.dataset.ropen;RESID=RESK;CADK=null;SEMID=null;drawCad();uiSave();return}
 if(t.dataset.rb){RESK=null;RESID=null;drawCad();uiSave();return}
 if(t.dataset.rdel)return excluirRes(t.dataset.rdel);
+if(t.dataset.sopen){abrirSemana(t.dataset.sopen);return}
+if(t.dataset.sdel)return excluirSemana(t.dataset.sdel);
+if(t.dataset.snew)return novaSemanaAnotacao();
 if(!MY)return;
 if(t.dataset.cnew)return novoCad();
 if(t.dataset.cren)return renomearCad(t.dataset.cren);
 if(t.dataset.cax)return excluirCad(t.dataset.cax);
-if(t.dataset.ck){CADK=cadResolve(t.dataset.ck);RESK=null;RESID=null;drawCad();uiSave();return}
-if(t.dataset.cb){CADK=null;RESID=null;drawCad();uiSave();return}
-if(t.dataset.csv){if(!CADK)return;clearTimeout(CT2);const ta=$('#cadta'),s1=$('#cads');if(!ta)return;if(s1)s1.textContent='Salvando…';try{await saveCad(CADK,{texto:ta.value});const s2=$('#cads');if(s2)s2.textContent='Salvo ✓';toast('Caderno salvo')}catch(er){if(s1)s1.textContent='';toast(ER(er))}return}
+if(t.dataset.ck){CADK=cadResolve(t.dataset.ck);RESK=null;RESID=null;SEMID=null;drawCad();uiSave();return}
+if(t.dataset.cb){CADK=null;RESID=null;SEMID=null;drawCad();uiSave();return}
+if(t.dataset.csv){if(!CADK)return;if(CADK===CAD_SEMANA)return salvarSemanaLista();clearTimeout(CT2);const ta=$('#cadta'),s1=$('#cads');if(!ta)return;if(s1)s1.textContent='Salvando…';try{await saveCad(CADK,{texto:ta.value});const s2=$('#cads');if(s2)s2.textContent='Salvo ✓';toast('Caderno salvo')}catch(er){if(s1)s1.textContent='';toast(ER(er))}return}
 if(t.dataset.cdl){const it=cadKnown(CADK),ta=$('#cadta');if(!it)return;const dl=await window.claude?.use('downloads');const tx='\uFEFF'+(ta?ta.value:it.texto),slug=(it.titulo||'caderno').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'caderno';if(!dl){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([tx],{type:'text/plain;charset=utf-8'}));a.download='caderno-'+slug+'.txt';a.click();return}try{await dl.save({filename:'caderno-'+slug+'.txt',data:tx})}catch(er){toast('Não foi possível baixar')}return}
 if(t.dataset.res){const it=cadKnown(CADK),ta=$('#cadta');if(!it||!ta)return;it.texto=ta.value;const tx=resumoTexto(it);if(!tx)return toast('Escreva no caderno antes de resumir');if($('#resta')&&$('#resta').value.trim()&&!await ask('Gerar o resumo de novo? O texto aberto aqui será substituído. O que já está na lista só muda se você salvar outra vez.'))return;let nome=MEN;if(!nome){try{nome=(await user?.me?.())?.name||''}catch(er){}}MEN=nome||'';RESID=null;const box=$('#resbox');if(!box)return;const n=tx.split(/\s+/).filter(Boolean).length;box.innerHTML=`<section class=card style="margin-top:14px"><h3>Resumo deste caderno</h3><p class=d>${n} palavras. Edite o texto e use Salvar resumo para guardar na lista.</p>${resFields(it.titulo+' · '+new Date().toLocaleDateString('pt-BR'),tx,MEN)}</section>`;box.scrollIntoView?.({behavior:'smooth',block:'nearest'})}});
 
@@ -1868,7 +1968,7 @@ S.acessos=[];if(isEd&&user&&user.listarAcessos){try{S.acessos=(await user.listar
 realEd=isEd;realMember=MEMBER;realMY=MY;window.__logEd=()=>!!isEd;if(window.LOG)LOG.ligar({db:()=>db,visitas:()=>S.agendamentos||[],cfg:()=>(S.cfg||{}).logistica||{},draw:()=>{try{draw('agendamentos')}catch(e){}},toast,ask});
 navR();$('#nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.menu){NM=!NM;navR();return}if(NM){NM=false}if(b.dataset.g){NP=b.dataset.g;show(GR[NP].items[0][0])}else if(b.dataset.t){if(b.dataset.np)NP=b.dataset.np;show(b.dataset.t)}};
 (SOVIS?[]:SOGAL?['galeria']:Object.keys(CFG).filter(c=>c!='conteudo'&&(c!='notas'||isEd))).forEach(c=>db.collection(c).onSnapshot(s=>{S[c]=s.docs.map(d=>({id:d.id,...d.data()}));draw(c);if(c=='galeria'&&CUR=='ideias'){cotFill();capRefresh()}if(c=='cartas'&&CUR=='cartas')drawC();if(c=='equipe')people();if(CUR=='home')drawH();if(CUR=='time'&&['equipe','trocas','domingos'].includes(c))drawT();dash();cal();if(c=='obras')modal();if(c=='anotobras'){obraNotes();if(CUR=='obras')draw('obras')}if(c=='extras'){if(MY)muDraw();const mb=document.querySelector('[data-mural]');if(mb){const n=MY?muN():0;mb.innerHTML='✏️'+(n?'<b>'+n+'</b>':'')}}if(c=='notas'){muSupDraw();migrarNotasMural()}if(CUR=='obras'&&['anotobras','obras'].includes(c)&&$('#trilhas')&&!$('#trilhas').hidden)drawTr();if(c=='equipe'){fillEsc();if(CUR=='estudos')drawPausa()}if((c=='equipe'||c=='trocas')&&$('#l-domingos'))draw('domingos');if(['equipe','trocas','domingos','agendamentos'].includes(c))initMeds(document);if(c=='agendamentos')bkM();if(c=='notas')relListaDraw();if((c=='agendamentos'||c=='ideias')&&CUR=='notas')relSyncNums()}));
-if(MY&&!SOGAL)db.collection('data/users/'+MY).onSnapshot(q=>{S.anot={};S.cad=[];S.cads={};S.resumos=[];S.fav={};S.seen={};CADL=1;q.docs.forEach(d=>{const x=d.data()||{};if(d.id.startsWith('seen-'))S.seen[d.id.slice(5)]=1;else if(d.id.startsWith('fav-'))S.fav[d.id.slice(4)]=1;else if(d.id.startsWith('res-'))S.resumos.push({id:d.id,...x});else if(d.id.startsWith('cad-'))S.cads[d.id]={texto:x.texto||'',titulo:x.titulo||'',icone:x.icone||'',ts:x.ts||0,apagado:x.apagado?1:0};else if(d.id.startsWith('n-'))S.cad.push({id:d.id,...x});else S.anot[d.id]=x.texto||''});if(!AN1){AN1=1;draw('equipe')}if(!FB1){FB1=1;setTimeout(syncFav,4000)}drawCad();if(CUR=='home')drawH();if(CUR=='obras')draw('obras');if(OPEN!=null)modal()},()=>{CADL=1;drawCad()});
+if(MY&&!SOGAL)db.collection('data/users/'+MY).onSnapshot(q=>{S.anot={};S.cad=[];S.cads={};S.resumos=[];S.semanas=[];S.fav={};S.seen={};CADL=1;q.docs.forEach(d=>{const x=d.data()||{};if(d.id.startsWith('seen-'))S.seen[d.id.slice(5)]=1;else if(d.id.startsWith('fav-'))S.fav[d.id.slice(4)]=1;else if(d.id.startsWith('res-'))S.resumos.push({id:d.id,...x});else if(d.id.startsWith('sem-'))S.semanas.push({id:d.id,titulo:x.titulo||'',texto:x.texto||'',ts:x.ts||0,criado:x.criado||x.ts||0,caderno:x.caderno||CAD_SEMANA});else if(d.id.startsWith('cad-'))S.cads[d.id]={texto:x.texto||'',titulo:x.titulo||'',icone:x.icone||'',ts:x.ts||0,apagado:x.apagado?1:0};else if(d.id.startsWith('n-'))S.cad.push({id:d.id,...x});else S.anot[d.id]=x.texto||''});if(!AN1){AN1=1;draw('equipe')}if(!FB1){FB1=1;setTimeout(syncFav,4000)}drawCad();if(CUR=='home')drawH();if(CUR=='obras')draw('obras');if(OPEN!=null)modal()},()=>{CADL=1;drawCad()});
 if(!SOGAL&&!SOVIS)db.collection('config').onSnapshot(q=>{const next={};q.docs.forEach(d=>next[d.id]=d.data());S.cfg=next;if(window.LOG&&LOG.cfgChegou)LOG.cfgChegou();wa();dash();if(CUR=='home')drawH();if(CUR=='ideias')draw('ideias');relListaDraw();if(CUR=='obras'&&$('#trilhas')&&!$('#trilhas').hidden)drawTr()},()=>{});
 function authBtn(){let b=document.getElementById('authbtn');if(!b){b=document.createElement('button');b.id='authbtn';b.type='button';b.className='hbtn';b.style.cssText='width:auto;border-radius:999px;padding:0 14px;font:800 13px Nunito,sans-serif';document.querySelector('.hd').append(b)}if(VIEW==='convidado'){b.textContent='Entrar';b.title='Entrar para alterar';b.setAttribute('aria-label','Entrar');b.onclick=()=>toast('Pré-visualização: este botão abre a entrada de quem não está logado. Sua sessão continua ativa.')}else if(MY){b.textContent='Sair';b.title='Sair da conta';b.setAttribute('aria-label','Sair');b.onclick=()=>window.painelSignOut&&window.painelSignOut()}else{b.textContent='Entrar';b.title='Entrar para alterar';b.setAttribute('aria-label','Entrar');b.onclick=()=>window.painelLogin&&window.painelLogin()}}
 function setView(v){VIEW=v==='equipe'||v==='convidado'?v:'sup';if(VIEW==='convidado'){isEd=false;MEMBER=false;MY=null}else if(VIEW==='equipe'){isEd=false;MEMBER=realMember;MY=realMY}else{isEd=realEd;MEMBER=realMember;MY=realMY}window.__logEd=()=>!!isEd;document.body.classList.toggle('vprev',VIEW!=='sup');const sel=$('#viewas');if(sel&&sel.value!==VIEW)sel.value=VIEW;let n=$('#vnote');if(VIEW==='sup'){n&&n.remove()}else{if(!n){n=document.createElement('div');n.id='vnote';document.querySelector('header').insertAdjacentElement('afterend',n)}n.innerHTML=VIEW==='convidado'?'<span>Visão convidado: o site abaixo é o que aparece para quem não entrou. Nada é salvo.</span> <button type=button class="btn g" data-view="sup">Voltar à supervisão</button>':'<span>Visão da equipe: a Gestão fica oculta, como para quem colabora logado.</span> <button type=button class="btn g" data-view="sup">Voltar à supervisão</button>'}document.querySelectorAll('#md,#im,#cm,#lb,.mb').forEach(el=>el.remove());const tab=location.hash.replace(/^#/,'')||CUR||'home';show(TABS[tab]?tab:'home');authBtn()}
@@ -1887,8 +1987,8 @@ if(ui&&!SOGAL&&(ui.tab===CUR||!TABS[hash])){
  if(ui.bk){BK=ui.bk;BKD=ui.bkf||null;bkM()}
  if(ui.open){OPEN=ui.open;OND=ui.on||'';modal()}
  if(ui.io){IO=ui.io;IE=ui.ie||0;imodal()}
- if(ui.resk&&CUR=='caderno'){RESK=ui.resk;RESID=ui.resk;drawCad()}
- else if(ui.cadk&&CUR=='caderno'){CADK=cadResolve(ui.cadk);drawCad()}
+ if(ui.resk&&CUR=='caderno'){RESK=ui.resk;RESID=ui.resk;SEMID=null;drawCad()}
+ else if(ui.cadk&&CUR=='caderno'){CADK=cadResolve(ui.cadk);SEMID=ui.semid||null;drawCad()}
  if(ui.mu&&typeof muOpen==='function'&&!$('#muf')){muOpen();const inp=$('#muf')&&$('#muf').elements.t;if(inp&&ui.mut)inp.value=ui.mut}
  if(ui.y)requestAnimationFrame(()=>scrollTo(0,ui.y));
  uiSave();

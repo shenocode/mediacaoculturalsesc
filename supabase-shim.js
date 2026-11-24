@@ -172,7 +172,10 @@
           nome: row.nome || '',
           email: row.email || '',
           texto: row.texto || '',
-          ts: row.ts || 0
+          ts: row.ts || 0,
+          criado: row.criado || row.ts || 0,
+          titulo: row.titulo || '',
+          entry_id: row.entry_id || null
         };
       });
     }
