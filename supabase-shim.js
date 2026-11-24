@@ -163,6 +163,21 @@
         p_role: role === 'supervisao' ? 'supervisao' : 'equipe'
       }));
       return r.data;
+    },
+    resumoCadernosSemana: async function () {
+      var r = await ok(sb.rpc('resumo_cadernos_semana'));
+      return (r.data || []).map(function (row) {
+        return {
+          owner: row.owner,
+          nome: row.nome || '',
+          email: row.email || '',
+          texto: row.texto || '',
+          ts: row.ts || 0,
+          criado: row.criado || row.ts || 0,
+          titulo: row.titulo || '',
+          entry_id: row.entry_id || null
+        };
+      });
     }
   };
 
