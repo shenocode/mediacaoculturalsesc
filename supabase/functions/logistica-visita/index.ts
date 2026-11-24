@@ -17,7 +17,7 @@ const TIPOS = new Set([
   "Outros",
 ]);
 
-const OCUPA = new Set(["Agendado", "Confirmado", "Realizado"]);
+const OCUPA = new Set(["Solicitado", "Agendado", "Confirmado", "Realizado"]);
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -126,11 +126,28 @@ function lgpdOk(v: unknown) {
   return v === true || v === "true" || v === "sim" || v === "1";
 }
 
-async function enviarEmail(key: string, de: string, para: string, assunto: string, corpo: string) {
+type Anexo = { filename: string; content: string; contentType?: string };
+
+async function enviarEmail(
+  key: string,
+  de: string,
+  para: string,
+  assunto: string,
+  corpo: string,
+  anexos?: Anexo[],
+) {
+  const payload: Record<string, unknown> = { from: de, to: [para], subject: assunto, html: corpo };
+  if (anexos && anexos.length) {
+    payload.attachments = anexos.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      content_type: a.contentType || "application/pdf",
+    }));
+  }
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: de, to: [para], subject: assunto, html: corpo }),
+    body: JSON.stringify(payload),
   });
   if (r.ok) return "";
   let msg = "O envio do e-mail foi recusado.";
@@ -140,6 +157,137 @@ async function enviarEmail(key: string, de: string, para: string, assunto: strin
     if (t) msg = t.slice(0, 180);
   } catch { /* a resposta do Resend veio sem texto */ }
   return msg;
+}
+
+function dataBr(dia: string) {
+  if (!DIA.test(dia)) return dia;
+  return dia.slice(8, 10) + "/" + dia.slice(5, 7) + "/" + dia.slice(0, 4);
+}
+
+function bytesB64(bytes: Uint8Array) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+
+function asciiPdf(s: string) {
+  return String(s || "")
+    .replace(/[ÁÀÂÃÄ]/g, "A").replace(/[áàâãä]/g, "a")
+    .replace(/[ÉÈÊË]/g, "E").replace(/[éèêë]/g, "e")
+    .replace(/[ÍÌÎÏ]/g, "I").replace(/[íìîï]/g, "i")
+    .replace(/[ÓÒÔÕÖ]/g, "O").replace(/[óòôõö]/g, "o")
+    .replace(/[ÚÙÛÜ]/g, "U").replace(/[úùûü]/g, "u")
+    .replace(/Ç/g, "C").replace(/ç/g, "c").replace(/Ñ/g, "N").replace(/ñ/g, "n")
+    .replace(/[—–·•]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/[^\x20-\x7E]/g, "?");
+}
+
+/** PDF simples (Helvetica) com o ofício da confirmação. */
+function oficioPdf(ficha: Record<string, unknown>, emailDevolucao: string): Uint8Array {
+  const linhas: string[] = [];
+  const push = (s: string) => {
+    const t = asciiPdf(String(s || "").replace(/[\r\n\t]+/g, " ")).trim();
+    if (!t) {
+      linhas.push("");
+      return;
+    }
+    const max = 90;
+    let rest = t;
+    while (rest.length > max) {
+      let corte = rest.lastIndexOf(" ", max);
+      if (corte < 40) corte = max;
+      linhas.push(rest.slice(0, corte).trim());
+      rest = rest.slice(corte).trim();
+    }
+    if (rest) linhas.push(rest);
+  };
+  const escola = texto(ficha.escola, 160);
+  const dia = texto(ficha.data, 10);
+  const hora = texto(ficha.hora, 5);
+  const fim = texto(ficha.fim, 5);
+  const transporte = texto(ficha.transporte, 40);
+  const onibus = transporte === "Ônibus do Sesc";
+  push("OFICIO - CONFIRMACAO DE AGENDAMENTO DE VISITA");
+  push("Mediacao Cultural - Sesc Piracicaba");
+  push("");
+  push("Instituicao / grupo: " + escola);
+  push("Data da visita: " + dataBr(dia));
+  push("Horario da visita no Sesc: " + hora + (fim ? " ate " + fim : ""));
+  if (texto(ficha.alunos, 6)) push("Numero de pessoas: " + texto(ficha.alunos, 6));
+  if (texto(ficha.tipo, 40)) push("Tipo de instituicao: " + texto(ficha.tipo, 40));
+  if (texto(ficha.serie, 80)) push("Faixa etaria / serie: " + texto(ficha.serie, 80));
+  if (texto(ficha.resp, 120)) push("Responsavel pelo grupo: " + texto(ficha.resp, 120));
+  if (texto(ficha.contato, 40)) push("Telefone: " + texto(ficha.contato, 40));
+  if (texto(ficha.email, 120)) push("E-mail da instituicao: " + texto(ficha.email, 120));
+  if (texto(ficha.pcd, 200)) push("Acessibilidade: " + texto(ficha.pcd, 200));
+  push("Transporte: " + (transporte || "Nao informado"));
+  if (onibus) {
+    const emb = Array.isArray(ficha.embarques) ? ficha.embarques as { endereco?: string; hora?: string }[] : [];
+    if (emb.length) {
+      emb.forEach((e, i) => {
+        push((i === 0 ? "Embarque na origem: " : "Parada de embarque: ") + texto(e.hora, 5) + " - " + texto(e.endereco, 180));
+      });
+    } else if (texto(ficha.embOrigem, 5)) {
+      push("Embarque na origem: " + texto(ficha.embOrigem, 5));
+      const ends = Array.isArray(ficha.enderecos) ? ficha.enderecos.map((x) => texto(x, 180)).filter(Boolean) : [];
+      if (ends[0]) push("Endereco de embarque: " + ends[0]);
+    }
+    if (texto(ficha.embSesc, 5)) push("Embarque no destino (volta no Sesc): " + texto(ficha.embSesc, 5));
+  }
+  if (texto(ficha.obs, 500)) {
+    push("");
+    push("Observacoes: " + texto(ficha.obs, 500));
+  }
+  push("");
+  push("INSTRUCOES PARA A INSTITUICAO");
+  push("1. Imprima este documento no papel timbrado da instituicao.");
+  push("2. Assine e carimbe o documento.");
+  push("3. Digitalize (foto nitida ou PDF) e envie por e-mail para:");
+  push(emailDevolucao || "(e-mail da supervisao a informar)");
+  push("4. Guarde o comprovante de envio ate a data da visita.");
+  push("");
+  push("A visita fica confirmada apos o recebimento do oficio assinado.");
+
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  const ops: string[] = ["BT", "/F1 11 Tf", "14 TL", "50 800 Td"];
+  linhas.forEach((ln, i) => {
+    if (i === 0) ops.push("/F1 13 Tf");
+    else if (i === 1) ops.push("/F1 10 Tf");
+    else if (ln.startsWith("INSTRUCOES")) ops.push("/F1 12 Tf");
+    else if (i === 2) ops.push("/F1 11 Tf");
+    ops.push("(" + esc(ln || " ") + ") Tj", "T*");
+    if (i === 0 || ln.startsWith("INSTRUCOES")) ops.push("/F1 11 Tf");
+  });
+  ops.push("ET");
+  const stream = ops.join("\n");
+  const enc = new TextEncoder();
+  const streamBytes = enc.encode(stream);
+  const pieces = [
+    "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n",
+    "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n",
+    "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n",
+    "4 0 obj<< /Length " + streamBytes.length + " >>stream\n" + stream + "\nendstream\nendobj\n",
+    "5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n",
+  ];
+  const header = enc.encode("%PDF-1.4\n");
+  const parts = [header, ...pieces.map((p) => enc.encode(p))];
+  const off = [0];
+  let pos = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) off.push(pos);
+    pos += parts[i].length;
+  }
+  let xref = "xref\n0 " + (pieces.length + 1) + "\n0000000000 65535 f \n";
+  for (let i = 1; i < off.length; i++) xref += String(off[i]).padStart(10, "0") + " 00000 n \n";
+  const tail = enc.encode(xref + "trailer<< /Size " + (pieces.length + 1) + " /Root 1 0 R >>\nstartxref\n" + pos + "\n%%EOF\n");
+  const out = new Uint8Array(pos + tail.length);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  out.set(tail, at);
+  return out;
 }
 
 function visitaDe(id: string, d: Record<string, unknown>): Visita | null {
@@ -401,11 +549,96 @@ Deno.serve(async (req) => {
     const doDia = dia ? visitas.filter((v) => v.data === dia) : [];
     return json({
       horarios: lista.map((hora) => ({ hora, ocupado: doDia.some((v) => ocupa(v) && v.hora === hora) })),
+      disponiveis: lista.filter((hora) => !doDia.some((v) => ocupa(v) && v.hora === hora)),
       durPadrao: cfg.durPadrao,
       durMin: cfg.durMin,
       margem: cfg.margem,
       lotacao: cfg.lotacao,
       mapa: key.length >= 20 && !!cfg.enderecoSesc,
+    });
+  }
+
+  if (acao === "confirmar") {
+    const id = texto(body.id, 40);
+    if (!id) return json({ error: "Informe a visita." }, 400);
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!jwt || jwt === (Deno.env.get("SUPABASE_ANON_KEY") || "")) {
+      return json({ error: "Entre na conta para confirmar a visita." }, 401);
+    }
+    const { data: authData, error: authErr } = await admin.auth.getUser(jwt);
+    const uid = authData?.user?.id || "";
+    if (authErr || !uid) return json({ error: "Entre na conta para confirmar a visita." }, 401);
+    const { data: perfil } = await admin.from("profiles").select("role").eq("id", uid).maybeSingle();
+    const papel = String(perfil?.role || "");
+    if (papel !== "supervisao" && papel !== "equipe") {
+      return json({ error: "Somente a equipe pode confirmar a visita." }, 403);
+    }
+    const { data: row } = await admin.from("docs").select("id,data").eq("path", "agendamentos").eq("id", id).maybeSingle();
+    if (!row) return json({ error: "Visita não encontrada." }, 404);
+    const ficha = { ...((row.data || {}) as Record<string, unknown>) };
+    const emailInst = texto(ficha.email, 120).toLowerCase();
+    if (!emailOk(emailInst)) return json({ error: "A visita não tem e-mail da instituição para enviar o ofício." }, 400);
+    if (ficha.oficioEnviado === true && body.forcar !== true && body.forcar !== "true") {
+      if (ficha.status !== "Confirmado") {
+        await admin.from("docs").update({
+          data: { ...ficha, status: "Confirmado" },
+        }).eq("path", "agendamentos").eq("id", id);
+      }
+      return json({ ok: true, jaEnviado: true, emailAviso: "O ofício desta visita já tinha sido enviado." });
+    }
+    const { data: chaveEmail } = await admin.rpc("chave_resend");
+    const resend = typeof chaveEmail === "string" ? chaveEmail.trim() : "";
+    if (resend.length < 20) return json({ error: "Ative o envio de e-mail (chave do Resend) antes de confirmar." }, 400);
+    const { data: aviso } = await admin.rpc("aviso_visita");
+    const caixa = aviso && typeof aviso === "object" ? aviso as { email?: string; de?: string } : {};
+    const de = texto(caixa.de, 160) || REMETENTE;
+    const inbox = texto(caixa.email, 120).toLowerCase();
+    const emailDevolucao = emailOk(inbox) ? inbox : "";
+    ficha.status = "Confirmado";
+    const pdf = oficioPdf(ficha, emailDevolucao);
+    const quando = dataBr(texto(ficha.data, 10)) + " às " + texto(ficha.hora, 5);
+    const escola = texto(ficha.escola, 160);
+    const corpo =
+      "<p>A visita de <b>" + html(escola) + "</b> em " + html(quando) + " foi <b>confirmada</b> pela mediação cultural do Sesc Piracicaba.</p>" +
+      "<p>Em anexo está o <b>ofício</b> com os dados do agendamento.</p>" +
+      "<p><b>O que fazer agora:</b></p>" +
+      "<ol>" +
+      "<li>Imprima o ofício no <b>papel timbrado</b> da instituição.</li>" +
+      "<li>Assine e carimbe o documento.</li>" +
+      "<li>Digitalize (foto nítida ou PDF) e envie por e-mail para <b>" + html(emailDevolucao || "o e-mail informado pela supervisão") + "</b>.</li>" +
+      "</ol>" +
+      (emailDevolucao ? "<p>E-mail para devolução do ofício assinado: <b>" + html(emailDevolucao) + "</b></p>" : "") +
+      "<p>Guarde o comprovante de envio até a data da visita.</p>";
+    const falha = await enviarEmail(
+      resend,
+      de,
+      emailInst,
+      "Visita confirmada — ofício para assinatura · Sesc Piracicaba",
+      corpo,
+      [{ filename: "oficio-visita-" + texto(ficha.data, 10) + ".pdf", content: bytesB64(pdf), contentType: "application/pdf" }],
+    );
+    if (falha) return json({ error: "Não foi possível enviar o ofício: " + falha }, 502);
+    const agora = new Date().toISOString();
+    const { error: upErr } = await admin.from("docs").update({
+      data: { ...ficha, status: "Confirmado", oficioEnviado: true, oficioEnviadoEm: agora },
+    }).eq("path", "agendamentos").eq("id", id);
+    if (upErr) return json({ error: "O e-mail saiu, mas não deu para marcar a visita como confirmada. Atualize o status manualmente." }, 500);
+    if (emailOk(inbox) && inbox !== emailInst) {
+      await enviarEmail(
+        resend,
+        de,
+        inbox,
+        "Ofício enviado — " + escola,
+        "<p>O ofício de confirmação foi enviado para <b>" + html(emailInst) + "</b>.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "</p><p>A instituição deve devolver o documento assinado e carimbado neste e-mail.</p>",
+      );
+    }
+    return json({
+      ok: true,
+      id,
+      status: "Confirmado",
+      emailEnviado: true,
+      emailAviso: "Enviamos a confirmação com o ofício para " + emailInst + ".",
+      emailDevolucao,
     });
   }
 
@@ -484,29 +717,36 @@ Deno.serve(async (req) => {
   const de = texto(caixa.de, 160) || REMETENTE;
   const inbox = texto(caixa.email, 120).toLowerCase();
   if (resend.length >= 20) {
-    const quando = dia.split("-").reverse().join("/") + " às " + hora;
+    const quando = dataBr(dia) + " às " + hora;
+    const trechosBus = transporte === "Ônibus do Sesc" && !resultado.pendente
+      ? "<p>Embarque na origem: <b>" + html(resultado.embOrigem || "—") + "</b>" +
+        (resultado.embSesc ? "<br>Embarque no destino (volta no Sesc): <b>" + html(resultado.embSesc) + "</b>" : "") +
+        "</p>"
+      : "";
     const falha = await enviarEmail(
       resend,
       de,
       email,
       "Recebemos sua solicitação de agendamento — Sesc Piracicaba",
-      "<p>Recebemos a solicitação de agendamento de <b>" + html(escola) + "</b> para " + html(quando) + ".</p><p><b>Aguarde a confirmação da sua visita.</b> Este envio ainda não reserva o horário. A supervisão da mediação cultural analisa o pedido e confirma.</p>",
+      "<p>Recebemos a solicitação de agendamento de <b>" + html(escola) + "</b> para " + html(quando) + ".</p>" +
+        trechosBus +
+        "<p>Sua solicitação <b>reservou o horário</b> e será analisada pela supervisão da mediação cultural. Em breve você recebe informações se a visita está confirmada. Quando confirmada, o ofício para assinatura chega por e-mail.</p>",
     );
     emailEnviado = !falha;
     emailAviso = falha
-      ? "A solicitação foi registrada. O e-mail de confirmação não saiu: " + falha
-      : "Enviamos a confirmação de recebimento para " + email + ". Aguarde a confirmação da visita.";
+      ? "A solicitação foi registrada e o horário ficou reservado. O e-mail de aviso não saiu: " + falha
+      : "Enviamos o aviso de recebimento para " + email + ". A solicitação será analisada e, em breve, você recebe se está confirmada.";
     if (emailOk(inbox)) {
       await enviarEmail(
         resend,
         de,
         inbox,
         "Nova solicitação de agendamento — " + escola,
-        "<p>Chegou uma solicitação com status <b>Solicitado</b>. Ela ainda não está no calendário da equipe.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
+        "<p>Chegou uma solicitação com status <b>Solicitado</b>. O horário já está reservado. Confira os dados e, se estiver tudo certo, mude o status para <b>Confirmado</b> para enviar o ofício à instituição.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
       );
     }
   } else {
-    emailAviso = "A solicitação foi registrada. O envio de e-mail ainda não está ativo.";
+    emailAviso = "A solicitação foi registrada e o horário ficou reservado. O envio de e-mail ainda não está ativo.";
   }
   return json({
     id,
