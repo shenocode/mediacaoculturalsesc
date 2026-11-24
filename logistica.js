@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
-  var OCUPA = { Solicitado: 1, Agendado: 1, Confirmado: 1, Realizado: 1 };
+  var OCUPA = { Solicitado: 1, Agendado: 1, Confirmado: 1, Realizado: 1, 'A conferir': 1 };
   var TIPOS = ['Particular', 'Escola Estadual', 'Escola Municipal', 'ONG', 'Universidade', 'Empresa', 'Sesc / funcionários', 'Outros'];
   var API = {};
   var timers = new WeakMap();
@@ -143,8 +143,18 @@
       var horas = listaDia(dia);
       if (atual && horas.indexOf(atual) < 0) horas.push(atual);
       var visitas = (API.visitas ? API.visitas() : []).filter(function (v) { return v.data === dia && OCUPA[v.status || 'Agendado']; });
+      var dur = cfgAtual().durPadrao;
       var html = '<option value="">Selecione…</option>' + horas.map(function (h) {
-        var ocup = visitas.some(function (v) { return v.hora === h && v.id !== vid; });
+        var ocup = visitas.some(function (v) {
+          if (v.id === vid) return false;
+          if (v.hora === h) return true;
+          var slot = (function (s) { var m = String(s || '').match(/^(\d{2}):(\d{2})$/); return m ? +m[1] * 60 + +m[2] : null; })(h);
+          var ini = (function (s) { var m = String(s || '').match(/^(\d{2}):(\d{2})$/); return m ? +m[1] * 60 + +m[2] : null; })(v.hora);
+          if (slot == null || ini == null) return false;
+          var fim = (function (s) { var m = String(s || '').match(/^(\d{2}):(\d{2})$/); return m ? +m[1] * 60 + +m[2] : null; })(v.fim);
+          if (fim == null || fim <= ini) fim = ini + dur;
+          return slot >= ini && slot < fim;
+        });
         return '<option value="' + h + '"' + (h === atual ? ' selected' : '') + (ocup ? ' disabled' : '') + '>' + h + (ocup ? ' (reservado)' : '') + '</option>';
       }).join('');
       if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; if (atual) sel.value = atual; }

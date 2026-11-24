@@ -17,7 +17,7 @@ const TIPOS = new Set([
   "Outros",
 ]);
 
-const OCUPA = new Set(["Solicitado", "Agendado", "Confirmado", "Realizado"]);
+const OCUPA = new Set(["Solicitado", "Agendado", "Confirmado", "Realizado", "A conferir"]);
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -63,6 +63,16 @@ function clamp(v: unknown, min: number, max: number, fallback: number) {
 
 function horaOk(s: string) {
   return HORA.test(s);
+}
+
+/** Aceita 9:00, 9h00, 09:00 etc. */
+function normHora(s: unknown) {
+  const m = String(s ?? "").trim().match(/^(\d{1,2})\s*[:hH]\s*(\d{2})$/);
+  if (!m) return "";
+  const h = m[1].padStart(2, "0");
+  const mm = m[2];
+  const out = h + ":" + mm;
+  return horaOk(out) ? out : "";
 }
 
 function toMin(s: string) {
@@ -292,7 +302,7 @@ function oficioPdf(ficha: Record<string, unknown>, emailDevolucao: string): Uint
 
 function visitaDe(id: string, d: Record<string, unknown>): Visita | null {
   const data = texto(d.data, 10);
-  const hora = texto(d.hora, 5);
+  const hora = normHora(d.hora) || texto(d.hora, 5);
   if (!DIA.test(data) || !horaOk(hora)) return null;
   const enderecos = Array.isArray(d.enderecos)
     ? d.enderecos.map((x) => texto(x, 180)).filter(Boolean).slice(0, 4)
@@ -300,21 +310,21 @@ function visitaDe(id: string, d: Record<string, unknown>): Visita | null {
   const embarques = Array.isArray(d.embarques)
     ? d.embarques.map((e) => {
       const o = e && typeof e === "object" ? e as Record<string, unknown> : {};
-      return { endereco: texto(o.endereco, 180), hora: texto(o.hora, 5) };
+      return { endereco: texto(o.endereco, 180), hora: normHora(o.hora) || texto(o.hora, 5) };
     }).filter((e) => horaOk(e.hora)).slice(0, 4)
     : [];
   return {
     id,
     data,
     hora,
-    fim: texto(d.fim, 5),
+    fim: normHora(d.fim) || texto(d.fim, 5),
     status: texto(d.status, 40) || "Agendado",
     transporte: texto(d.transporte, 40),
     enderecos,
     embarques,
-    embOrigem: texto(d.embOrigem, 5),
-    embSesc: texto(d.embSesc, 5),
-    busLivreHora: texto(d.busLivreHora, 5),
+    embOrigem: normHora(d.embOrigem) || texto(d.embOrigem, 5),
+    embSesc: normHora(d.embSesc) || texto(d.embSesc, 5),
+    busLivreHora: normHora(d.busLivreHora) || texto(d.busLivreHora, 5),
     busLivreEndereco: texto(d.busLivreEndereco, 180),
     logisticaPendente: d.logisticaPendente === true,
   };
@@ -322,6 +332,18 @@ function visitaDe(id: string, d: Record<string, unknown>): Visita | null {
 
 function ocupa(v: Visita) {
   return OCUPA.has(v.status);
+}
+
+/** Horário da lista já comprometido: mesmo início ou início dentro da visita. */
+function ocupaHorario(v: Visita, hora: string, durPadrao: number) {
+  if (!ocupa(v)) return false;
+  if (v.hora === hora) return true;
+  const slot = toMin(hora);
+  const ini = toMin(v.hora);
+  if (slot == null || ini == null) return false;
+  let fim = toMin(v.fim);
+  if (fim == null || fim <= ini) fim = ini + Math.max(20, durPadrao || 60);
+  return slot >= ini && slot < fim;
 }
 
 function onibus(v: Visita) {
@@ -420,7 +442,7 @@ async function calcularUm(
   const lista = horariosDia(cfg, dia);
   if (!lista.includes(hora)) return vazio({ motivo: "Esse horário não está aberto neste dia." });
   const outras = visitas.filter((v) => v.data === dia && v.id !== ignoreId);
-  if (outras.some((v) => ocupa(v) && v.hora === hora)) {
+  if (outras.some((v) => ocupaHorario(v, hora, cfg.durPadrao))) {
     return vazio({ motivo: "Esse horário já está reservado." });
   }
   if (transporte !== "Ônibus do Sesc") {
@@ -548,8 +570,8 @@ Deno.serve(async (req) => {
     const lista = dia ? horariosDia(cfg, dia) : cfg.horarios;
     const doDia = dia ? visitas.filter((v) => v.data === dia) : [];
     return json({
-      horarios: lista.map((hora) => ({ hora, ocupado: doDia.some((v) => ocupa(v) && v.hora === hora) })),
-      disponiveis: lista.filter((hora) => !doDia.some((v) => ocupa(v) && v.hora === hora)),
+      horarios: lista.map((hora) => ({ hora, ocupado: doDia.some((v) => ocupaHorario(v, hora, cfg.durPadrao)) })),
+      disponiveis: lista.filter((hora) => !doDia.some((v) => ocupaHorario(v, hora, cfg.durPadrao))),
       durPadrao: cfg.durPadrao,
       durMin: cfg.durMin,
       margem: cfg.margem,
