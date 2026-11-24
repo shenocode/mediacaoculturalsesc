@@ -131,7 +131,18 @@
   }
   function busHtml() {
     var ed = supervision();
-    return '<div class=medw data-busbox><div data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>Informe a data, o horário e o endereço. O sistema mostra o embarque na origem e no destino.</div></div><label>Fim da mediação<input name=fim type=time></label>' + (ed ? '<label class="chk" data-tr hidden><input type=checkbox name=logmanual> Ajustar embarque e volta à mão</label><label data-manual hidden>Embarque na origem<input name=embOrigem type=time></label><label data-manual hidden>Embarque no destino (volta no Sesc)<input name=embSesc type=time></label>' : '') + '</div>';
+    return '<div class=medw data-busbox><div data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>O sistema calcula o embarque, a volta e o fim da mediação a partir do trajeto e da próxima visita deste dia.</div></div><label data-tr hidden>Embarque na origem<input name=embOrigem type=time readonly></label><label>Fim da mediação<input name=fim type=time></label><label data-tr hidden>Embarque no destino (volta no Sesc)<input name=embSesc type=time readonly></label>' + (ed ? '<label class="chk" data-tr hidden><input type=checkbox name=logmanual> Ajustar embarque e volta à mão</label>' : '') + '</div>';
+  }
+  function sugerirFimProprio(f) {
+    if (!f || !f.elements || !f.elements.fim || !f.elements.hora) return;
+    var on = f.elements.transporte && f.elements.transporte.value === 'Ônibus do Sesc';
+    if (on) return;
+    if (f.elements.fim.dataset.user === '1') return;
+    if (f.elements.fim.value && f.elements.fim.dataset.auto !== '1') return;
+    var fim = maisMin(f.elements.hora.value, cfgAtual().durPadrao);
+    if (!fim) return;
+    f.elements.fim.value = fim;
+    f.elements.fim.dataset.auto = '1';
   }
   function sync(f) {
     if (!f || !f.elements) return;
@@ -163,8 +174,14 @@
     var varios = f.elements.varios && f.elements.varios.checked;
     f.querySelectorAll('[data-maiswrap]').forEach(function (el) { el.hidden = !on || !varios; });
     var manual = f.elements.logmanual && f.elements.logmanual.checked && on;
-    f.querySelectorAll('[data-manual]').forEach(function (el) { el.hidden = !manual; });
-    if (f.elements.fim) f.elements.fim.readOnly = !!(on && !manual);
+    ['fim', 'embOrigem', 'embSesc'].forEach(function (nome) {
+      var el = f.elements[nome];
+      if (!el) return;
+      var travado = !!(on && !manual);
+      el.readOnly = travado;
+      el.title = travado ? 'Calculado pelo sistema. Marque o ajuste só se precisar mudar.' : '';
+    });
+    sugerirFimProprio(f);
     atualizarMapa(f);
   }
   function hidratar(f, rec) {
@@ -188,21 +205,25 @@
         pendente: !!rec.logisticaPendente,
         motivo: rec.logisticaMotivo || '',
         embarques: rec.embarques || [],
+        embOrigem: rec.embOrigem || '',
         embSesc: rec.embSesc || '',
         fim: rec.fim || '',
         duracao: 0
       }, rec.hora || '');
-    }
+      if (!(f.elements.logmanual && f.elements.logmanual.checked)) preview(f);
+    } else sugerirFimProprio(f);
   }
   function textoRes(r, chegada) {
     if (!r) return '';
     if (r.pendente) return r.motivo || 'A supervisão confirma o horário de embarque.';
+    var linhas = [];
     if (!r.ok) {
       var alt = (r.alternativas || []).filter(Boolean);
-      return (r.motivo || 'O ônibus não chega a tempo neste horário.') + (alt.length ? ' Nestes horários o trajeto cabe: ' + alt.join(', ') + '.' : ' Nenhum outro horário deste dia comporta o trajeto.');
+      linhas.push(r.motivo || 'O ônibus não chega a tempo neste horário.');
+      if (alt.length) linhas.push('Nestes horários o trajeto cabe: ' + alt.join(', ') + '.');
+      else if (!r.embOrigem && !r.fim) linhas.push('Nenhum outro horário deste dia comporta o trajeto.');
     }
     var emb = r.embarques || [];
-    var linhas = [];
     if (emb.length) {
       emb.forEach(function (e, i) {
         linhas.push((i === 0 ? 'Embarque na origem às ' : 'Parada de embarque às ') + e.hora + (e.endereco ? ' · ' + e.endereco : ''));
@@ -210,9 +231,15 @@
     } else if (r.embOrigem) {
       linhas.push('Embarque na origem às ' + r.embOrigem + '.');
     }
-    if (chegada) linhas.push('Chegada / início da visita no Sesc às ' + chegada + '.');
-    if (r.fim) linhas.push('A mediação vai até ' + r.fim + (r.duracao ? ' (' + r.duracao + ' min)' : '') + '.');
+    if (chegada && (r.ok || r.embOrigem)) linhas.push('Chegada / início da visita no Sesc às ' + chegada + '.');
+    if (r.fim) {
+      var det = r.duracao ? ' (' + r.duracao + ' min)' : '';
+      linhas.push(r.encurtada
+        ? 'A mediação vai até ' + r.fim + det + ', para o ônibus levar o grupo e ainda buscar a próxima visita.'
+        : 'A mediação vai até ' + r.fim + det + '.');
+    }
     if (r.embSesc) linhas.push('Embarque no destino (volta no Sesc) às ' + r.embSesc + '.');
+    if (r.estimativa) linhas.push('O tempo de rua é uma estimativa. Os horários já vêm preenchidos. Ajuste só se o trajeto for diferente.');
     return linhas.join('\n');
   }
   function pintar(f, r, chegada) {
@@ -220,8 +247,8 @@
     var box = f.querySelector('[data-logmsg]');
     if (box) box.textContent = textoRes(r, chegada || (f.elements.hora && f.elements.hora.value) || '');
     var manual = f.elements.logmanual && f.elements.logmanual.checked;
-    if (r && r.ok && !manual) {
-      if (f.elements.fim && r.fim) f.elements.fim.value = r.fim;
+    if (r && !manual) {
+      if (f.elements.fim && r.fim) { f.elements.fim.value = r.fim; delete f.elements.fim.dataset.user; }
       if (f.elements.embOrigem && r.embOrigem) f.elements.embOrigem.value = r.embOrigem;
       if (f.elements.embSesc && r.embSesc) f.elements.embSesc.value = r.embSesc;
     }
@@ -242,6 +269,8 @@
     var hora = f.elements.hora && f.elements.hora.value;
     var enderecos = endsDe(f);
     if (!dia || !hora || !enderecos.length || !window.painelLogistica) return;
+    var box0 = f.querySelector('[data-logmsg]');
+    if (box0 && !(f.elements.embOrigem && f.elements.embOrigem.value)) box0.textContent = 'Calculando o embarque, a volta e o fim da mediação…';
     try {
       var r = await window.painelLogistica({
         acao: 'calcular', data: dia, hora: hora, enderecos: enderecos,
@@ -473,7 +502,7 @@
   }
 
   function publico() {
-    return '<section class="card vpub"><h2>Pedir uma visita</h2><p class=d>Mediação cultural · Sesc Piracicaba. Escolha uma data e um horário ainda disponíveis. Se o grupo vier no ônibus do Sesc, informe o endereço de embarque: o mapa e os horários de origem e destino aparecem para você conferir. A supervisão analisa o pedido e, ao confirmar, envia o ofício por e-mail.</p><form id=vpub novalidate><label>Escola ou grupo<input name=escola required autocomplete=organization></label><label>Data<input name=data type=date required></label><label>Horário da visita no Sesc<select name=hora required><option value="">Escolha a data primeiro</option></select></label><label>Nº de pessoas<input name=alunos type=number min=1 max=500></label><label>Tipo de instituição<select name=tipo>' + TIPOS.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select></label><label>Faixa etária / ano ou série<input name=serie></label><label>Responsável pelo grupo<input name=resp autocomplete=name></label><label>Telefone<input name=contato type=tel autocomplete=tel required></label><label>E-mail<input name=email type=email autocomplete=email required></label><label>Pessoas com deficiência (quantas e qual)<input name=pcd></label><label>Transporte<select name=transporte><option>Transporte próprio</option><option>Ônibus do Sesc</option></select></label><div class=medw data-tr data-ends hidden><label class=chk><input type=checkbox name=varios> Embarque em mais de um endereço, antes de ir ao Sesc</label><div data-endlist>' + rowEnd('') + '</div><p data-maiswrap hidden><button type=button class="btn g" data-logact=mais-end>Incluir outro endereço</button></p><p class=mut data-maiswrap hidden>A conta soma uma margem em cada trecho, para imprevisto.</p>' + mapHtml() + '</div><div class=medw data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>Ao pedir o ônibus, informe o endereço. O embarque na origem e no destino aparecem aqui.</div></div><label>Observações da visita<textarea name=obs rows=3 placeholder="Acessibilidade, interesses, temas"></textarea></label><p><button type=button class="btn g" data-logact=privacidade>Política de privacidade — LGPD</button></p><label class=chk><input type=checkbox name=lgpd> Li a política de privacidade e autorizo o uso desses dados para analisar e agendar a visita.</label><div class=cfsb><button class=btn type=submit>Enviar solicitação</button></div></form></section>';
+    return '<section class="card vpub"><h2>Pedir uma visita</h2><p class=d>Mediação cultural · Sesc Piracicaba. Escolha uma data e um horário ainda disponíveis. Se o grupo vier no ônibus do Sesc, informe o endereço de embarque: o mapa e os horários de origem e destino aparecem para você conferir. A supervisão analisa o pedido e, ao confirmar, envia o ofício por e-mail.</p><form id=vpub novalidate><label>Escola ou grupo<input name=escola required autocomplete=organization></label><label>Data<input name=data type=date required></label><label>Horário da visita no Sesc<select name=hora required><option value="">Escolha a data primeiro</option></select></label><label>Nº de pessoas<input name=alunos type=number min=1 max=500></label><label>Tipo de instituição<select name=tipo>' + TIPOS.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select></label><label>Faixa etária / ano ou série<input name=serie></label><label>Responsável pelo grupo<input name=resp autocomplete=name></label><label>Telefone<input name=contato type=tel autocomplete=tel required></label><label>E-mail<input name=email type=email autocomplete=email required></label><label>Pessoas com deficiência (quantas e qual)<input name=pcd></label><label>Transporte<select name=transporte><option>Transporte próprio</option><option>Ônibus do Sesc</option></select></label><div class=medw data-tr data-ends hidden><label class=chk><input type=checkbox name=varios> Embarque em mais de um endereço, antes de ir ao Sesc</label><div data-endlist>' + rowEnd('') + '</div><p data-maiswrap hidden><button type=button class="btn g" data-logact=mais-end>Incluir outro endereço</button></p><p class=mut data-maiswrap hidden>A conta soma uma margem em cada trecho, para imprevisto.</p>' + mapHtml() + '</div><div class=medw data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>Ao pedir o ônibus, informe o endereço. O embarque na origem e no destino aparecem aqui.</div></div><label>Observações da visita<textarea name=obs rows=3 placeholder="Acessibilidade, interesses, temas"></textarea></label><div class=vfoot><label class=chk><input type=checkbox name=lgpd> Li a política de privacidade e autorizo o uso desses dados para analisar e agendar a visita.</label><button type=button class="btn g" data-logact=privacidade>Política de privacidade — LGPD</button><button class=btn type=submit>Enviar solicitação</button></div></form></section>';
   }
   function bootPublico() {
     var hold = document.getElementById('visita-pub');
@@ -572,12 +601,15 @@
     if (f.id === 'logdia' && e.target.name === 'data') { desenhaDia(e.target.value); return; }
     if (e.target.name === 'data' && f.id === 'vpub') abrirDia(f);
     if (e.target.name === 'varios' || e.target.name === 'logmanual' || e.target.name === 'data' || e.target.name === 'transporte') sync(f);
+    if (e.target.name === 'hora') sugerirFimProprio(f);
     if (['data', 'hora', 'transporte', 'alunos', 'varios'].indexOf(e.target.name) >= 0) prever(f);
+    if (e.target.name === 'logmanual' && !e.target.checked) prever(f);
   }
   function onInput(e) {
     var f = e.target.closest && e.target.closest('form');
     if (!f) return;
     if (f.id === 'logcfg' || f.id === 'logmail') f.dataset.user = '1';
+    if (e.target.name === 'fim' && !e.target.readOnly) e.target.dataset.user = '1';
     if (e.target.name === 'end') {
       clearTimeout(atualizarMapa._t);
       atualizarMapa._t = setTimeout(function () { atualizarMapa(f); }, 400);
@@ -717,7 +749,7 @@
   if (!document.getElementById('log-css')) {
     var s = document.createElement('style');
     s.id = 'log-css';
-    s.textContent = '.vpub{max-width:760px;margin:0 auto}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}.logmap{margin-top:8px;border:1.5px solid #d4d4e0;border-radius:10px;overflow:hidden;background:#eef0f6}.logmap iframe{display:block;width:100%;height:220px;border:0}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .logchip{display:block;width:100%;margin-top:2px;padding:1px 4px;border-radius:4px;font:700 11px Nunito,sans-serif;line-height:1.2;text-align:left;white-space:normal;cursor:pointer}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}#logcal .logfeito{background:#f6e4e4;color:#7a3030;border:1.5px solid #e4c4c4}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
+    s.textContent = '.medw input[type=time][readonly]{background:#f4f1e8}.vpub{max-width:760px;margin:0 auto}#vpub .vfoot{grid-column:1/-1;display:grid;grid-template-columns:auto auto;grid-template-areas:"consent consent" "privacy submit";justify-content:space-between;align-items:center;gap:12px 16px;margin-top:2px;padding-top:12px;border-top:1.5px solid #ead9a4}#vpub .vfoot .chk{grid-area:consent;align-items:flex-start;gap:10px;margin:0;font-size:14.5px;font-weight:700;line-height:1.4}#vpub .vfoot .chk input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;flex:none;accent-color:#2d2e5f}#vpub .vfoot .btn{align-self:center;width:auto;margin:0;white-space:nowrap}#vpub .vfoot [data-logact=privacidade]{grid-area:privacy;justify-self:start}#vpub .vfoot [type=submit]{grid-area:submit;justify-self:end}@media(max-width:700px){#vpub .vfoot{grid-template-columns:1fr;grid-template-areas:"consent" "privacy" "submit"}#vpub .vfoot .btn{width:100%;white-space:normal;justify-self:stretch}}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}.logmap{margin-top:8px;border:1.5px solid #d4d4e0;border-radius:10px;overflow:hidden;background:#eef0f6}.logmap iframe{display:block;width:100%;height:220px;border:0}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .logchip{display:block;width:100%;margin-top:2px;padding:1px 4px;border-radius:4px;font:700 11px Nunito,sans-serif;line-height:1.2;text-align:left;white-space:normal;cursor:pointer}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}#logcal .logfeito{background:#f6e4e4;color:#7a3030;border:1.5px solid #e4c4c4}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
     document.head.appendChild(s);
   }
 

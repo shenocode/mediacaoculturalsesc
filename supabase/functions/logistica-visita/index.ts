@@ -351,28 +351,87 @@ function onibus(v: Visita) {
 }
 
 const geoCache = new Map<string, Ponto | null>();
-const minCache = new Map<string, number | null>();
+type Trecho = { min: number; estimado: boolean };
+type Fonte = { nome: "matrix" | "directions" | "osrm" | "reta"; osrmOff: boolean };
+const minCache = new Map<string, Trecho>();
 
-async function geocode(key: string, endereco: string): Promise<Ponto | null> {
-  const k = endereco.trim().toLowerCase();
+function comPrazo<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      () => { clearTimeout(timer); resolve(null); },
+    );
+  });
+}
+
+function minutosReta(a: Ponto, b: Ponto) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const la1 = a.lat * rad;
+  const la2 = b.lat * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  const km = 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+  if (!Number.isFinite(km)) return 20;
+  const min = Math.round((km * 1.35) / 28 * 60) + 2;
+  return Math.max(5, min);
+}
+
+function kmEntre(a: Ponto, b: Ponto) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function cidadeDe(endereco: string) {
+  const uf = /^(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO|Brasil)$/i;
+  const partes = endereco.split(/[,;]/).map((s) => s
+    .replace(/\s*[–—-]\s*[A-Za-z]{2}\b/g, "")
+    .replace(/\bCEP\b/ig, "")
+    .replace(/\d{5}-?\d{3}/g, "")
+    .trim()).filter(Boolean);
+  for (let i = partes.length - 1; i >= 0; i--) {
+    if (partes[i].length > 2 && !uf.test(partes[i]) && !/^\d+$/.test(partes[i])) return partes[i];
+  }
+  return "";
+}
+
+async function geocode(key: string, endereco: string, perto?: Ponto | null): Promise<Ponto | null> {
+  const bias = perto ? `${perto.lat.toFixed(2)},${perto.lng.toFixed(2)}` : "";
+  const k = endereco.trim().toLowerCase() + "|" + bias;
   if (geoCache.has(k)) return geoCache.get(k) || null;
   const u = new URL("https://maps.googleapis.com/maps/api/geocode/json");
   u.searchParams.set("address", endereco);
   u.searchParams.set("region", "br");
   u.searchParams.set("components", "country:BR");
   u.searchParams.set("language", "pt-BR");
+  if (perto) {
+    const d = 0.35;
+    u.searchParams.set("bounds", `${(perto.lat - d).toFixed(4)},${(perto.lng - d).toFixed(4)}|${(perto.lat + d).toFixed(4)},${(perto.lng + d).toFixed(4)}`);
+  }
   u.searchParams.set("key", key);
   const r = await fetch(u);
   const j = await r.json().catch(() => null) as { results?: { geometry?: { location?: { lat: number; lng: number } } }[] } | null;
   const loc = j?.results?.[0]?.geometry?.location;
-  const p = loc ? { lat: loc.lat, lng: loc.lng, endereco } : null;
+  const p = loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) ? { lat: loc.lat, lng: loc.lng, endereco } : null;
   geoCache.set(k, p);
   return p;
 }
 
-async function minutos(key: string, a: Ponto, b: Ponto): Promise<number | null> {
-  const k = `${a.lat.toFixed(5)},${a.lng.toFixed(5)}|${b.lat.toFixed(5)},${b.lng.toFixed(5)}`;
-  if (minCache.has(k)) return minCache.get(k) ?? null;
+async function geocodePerto(key: string, endereco: string, sesc: Ponto, cidade: string): Promise<Ponto | null> {
+  const direto = await geocode(key, endereco, sesc);
+  if (!direto) return null;
+  if (!Number.isFinite(kmEntre(direto, sesc)) || kmEntre(direto, sesc) <= 80) return direto;
+  if (!cidade || endereco.toLowerCase().includes(cidade.toLowerCase())) return direto;
+  const ajustado = await geocode(key, endereco + ", " + cidade, sesc);
+  if (ajustado && kmEntre(ajustado, sesc) < kmEntre(direto, sesc)) return { ...ajustado, endereco };
+  return direto;
+}
+
+async function minutosMatrix(key: string, a: Ponto, b: Ponto): Promise<number | "denied" | null> {
   const u = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
   u.searchParams.set("origins", `${a.lat},${a.lng}`);
   u.searchParams.set("destinations", `${b.lat},${b.lng}`);
@@ -380,21 +439,77 @@ async function minutos(key: string, a: Ponto, b: Ponto): Promise<number | null> 
   u.searchParams.set("language", "pt-BR");
   u.searchParams.set("key", key);
   const r = await fetch(u);
-  const j = await r.json().catch(() => null) as { rows?: { elements?: { status?: string; duration?: { value?: number } }[] }[] } | null;
+  const j = await r.json().catch(() => null) as { status?: string; rows?: { elements?: { status?: string; duration?: { value?: number } }[] }[] } | null;
+  const status = j?.status || "";
+  if (status === "REQUEST_DENIED" || status === "OVER_DAILY_LIMIT" || status === "OVER_QUERY_LIMIT") return "denied";
   const el = j?.rows?.[0]?.elements?.[0];
-  const seg = el?.status === "OK" && el.duration?.value ? Math.max(1, Math.round(el.duration.value / 60)) : null;
-  minCache.set(k, seg);
-  return seg;
+  const seg = el?.duration?.value;
+  if (el?.status === "OK" && typeof seg === "number" && seg >= 0) return Math.max(1, Math.round(seg / 60));
+  return null;
 }
 
-async function somar(key: string, pontos: Ponto[], margem: number) {
-  let total = 0;
-  for (let i = 0; i < pontos.length - 1; i++) {
-    const m = await minutos(key, pontos[i], pontos[i + 1]);
-    if (m == null) return null;
-    total += m + margem;
+async function minutosDirections(key: string, a: Ponto, b: Ponto): Promise<number | "denied" | null> {
+  const u = new URL("https://maps.googleapis.com/maps/api/directions/json");
+  u.searchParams.set("origin", `${a.lat},${a.lng}`);
+  u.searchParams.set("destination", `${b.lat},${b.lng}`);
+  u.searchParams.set("mode", "driving");
+  u.searchParams.set("language", "pt-BR");
+  u.searchParams.set("key", key);
+  const r = await fetch(u);
+  const j = await r.json().catch(() => null) as { status?: string; routes?: { legs?: { duration?: { value?: number } }[] }[] } | null;
+  const status = j?.status || "";
+  if (status === "REQUEST_DENIED" || status === "OVER_DAILY_LIMIT" || status === "OVER_QUERY_LIMIT") return "denied";
+  const seg = j?.routes?.[0]?.legs?.[0]?.duration?.value;
+  if (status === "OK" && typeof seg === "number" && seg >= 0) return Math.max(1, Math.round(seg / 60));
+  return null;
+}
+
+async function minutosOsrm(a: Ponto, b: Ponto): Promise<number | null> {
+  const u = "https://router.project-osrm.org/route/v1/driving/" + a.lng + "," + a.lat + ";" + b.lng + "," + b.lat + "?overview=false";
+  const r = await fetch(u);
+  const j = await r.json().catch(() => null) as { code?: string; routes?: { duration?: number }[] } | null;
+  const seg = j?.routes?.[0]?.duration;
+  if (j?.code === "Ok" && typeof seg === "number" && seg > 0) return Math.max(1, Math.round(seg / 60));
+  return null;
+}
+
+async function medir(key: string, a: Ponto, b: Ponto, fonte: Fonte): Promise<Trecho> {
+  if (fonte.nome === "matrix" && key.length >= 20) {
+    const m = await comPrazo(minutosMatrix(key, a, b), 4000);
+    if (typeof m === "number") return { min: m, estimado: false };
+    if (m === "denied") fonte.nome = "directions";
   }
-  return total;
+  if (fonte.nome !== "osrm" && fonte.nome !== "reta" && key.length >= 20) {
+    const d = await comPrazo(minutosDirections(key, a, b), 4000);
+    if (typeof d === "number") return { min: d, estimado: false };
+    if (d === "denied") fonte.nome = "osrm";
+  }
+  if (!fonte.osrmOff && fonte.nome !== "reta") {
+    const o = await comPrazo(minutosOsrm(a, b), 4000);
+    if (typeof o === "number") return { min: o, estimado: false };
+    fonte.osrmOff = true;
+  }
+  return { min: minutosReta(a, b), estimado: true };
+}
+
+async function minutos(key: string, a: Ponto, b: Ponto, fonte: Fonte): Promise<Trecho> {
+  const k = `${a.lat.toFixed(5)},${a.lng.toFixed(5)}|${b.lat.toFixed(5)},${b.lng.toFixed(5)}`;
+  const hit = minCache.get(k);
+  if (hit) return hit;
+  const t = await medir(key, a, b, fonte);
+  if (!t.estimado) minCache.set(k, t);
+  return t;
+}
+
+async function somar(key: string, pontos: Ponto[], margem: number, fonte: Fonte) {
+  let total = 0;
+  let estimado = false;
+  for (let i = 0; i < pontos.length - 1; i++) {
+    const m = await minutos(key, pontos[i], pontos[i + 1], fonte);
+    total += m.min + margem;
+    if (m.estimado) estimado = true;
+  }
+  return { total, estimado };
 }
 
 type Resultado = {
@@ -408,6 +523,8 @@ type Resultado = {
   duracao: number;
   busLivreHora: string;
   busLivreEndereco: string;
+  estimativa: boolean;
+  encurtada: boolean;
 };
 
 function vazio(parcial: Partial<Resultado>): Resultado {
@@ -422,6 +539,8 @@ function vazio(parcial: Partial<Resultado>): Resultado {
     duracao: 0,
     busLivreHora: "",
     busLivreEndereco: "",
+    estimativa: false,
+    encurtada: false,
     ...parcial,
   };
 }
@@ -461,81 +580,102 @@ async function calcularUm(
     return vazio({ pendente: true, motivo: "A supervisão confirma o horário de embarque." });
   }
 
+  const sesc = await geocode(key, cfg.enderecoSesc);
+  if (!sesc) return vazio({ pendente: true, motivo: "A supervisão confirma o horário de embarque." });
+  const cidade = cidadeDe(cfg.enderecoSesc);
   const stops: Ponto[] = [];
   for (const end of enderecos) {
-    const p = await geocode(key, end);
+    const p = await geocodePerto(key, end, sesc, cidade);
     if (!p) return vazio({ pendente: true, motivo: `Não localizei o endereço “${end}”. A solicitação pode seguir e a supervisão confirma o embarque.` });
     stops.push(p);
   }
-  const sesc = await geocode(key, cfg.enderecoSesc);
-  if (!sesc) return vazio({ pendente: true, motivo: "A supervisão confirma o horário de embarque." });
 
-  const ida = await somar(key, [...stops, sesc], cfg.margem);
-  if (ida == null) return vazio({ pendente: true, motivo: "Não consegui calcular o trajeto. A solicitação pode seguir e a supervisão confirma o embarque." });
+  const fonte: Fonte = { nome: "matrix", osrmOff: false };
+  const idaR = await somar(key, [...stops, sesc], cfg.margem, fonte);
+  const ida = idaR.total;
+  let estimativa = idaR.estimado;
 
   let t = H - ida;
   const embarques: Embarque[] = [];
   for (let i = 0; i < stops.length; i++) {
     if (i > 0) {
-      const trecho = await minutos(key, stops[i - 1], stops[i]);
-      if (trecho == null) return vazio({ pendente: true, motivo: "Não consegui calcular o trajeto. A solicitação pode seguir e a supervisão confirma o embarque." });
-      t += trecho + cfg.margem;
+      const trecho = await minutos(key, stops[i - 1], stops[i], fonte);
+      if (trecho.estimado) estimativa = true;
+      t += trecho.min + cfg.margem;
     }
     const marca = toHH(i === 0 ? H - ida : t);
-    if (!marca) return vazio({ motivo: "O embarque ficaria antes do começo do dia." });
+    if (!marca) return vazio({ motivo: "O embarque ficaria antes do começo do dia.", estimativa });
     embarques.push({ endereco: stops[i].endereco, hora: marca });
     if (i === 0) t = H - ida;
   }
   const primeiro = toMin(embarques[0].hora);
-  if (primeiro == null) return vazio({ motivo: "O embarque ficaria antes do começo do dia." });
+  if (primeiro == null) return vazio({ motivo: "O embarque ficaria antes do começo do dia.", estimativa });
 
   const doDia = outras.filter(onibus).sort((a, b) => a.hora.localeCompare(b.hora));
   const prev = [...doDia].reverse().find((v) => v.hora < hora) || null;
   if (prev) {
     const livreMin = toMin(prev.busLivreHora) ?? toMin(prev.embSesc) ?? toMin(prev.fim) ?? toMin(prev.hora);
     const livreEnd = prev.busLivreEndereco || cfg.enderecoSesc;
-    const livreP = livreEnd ? await geocode(key, livreEnd) : null;
+    const livreP = livreEnd ? await geocode(key, livreEnd, sesc) : null;
     if (livreMin != null && livreP) {
-      const ate = await minutos(key, livreP, stops[0]);
-      if (ate != null && primeiro < livreMin + ate + cfg.margem) {
-        return vazio({ motivo: "O ônibus não chega a tempo neste horário." });
+      const ate = await minutos(key, livreP, stops[0], fonte);
+      if (ate.estimado) estimativa = true;
+      if (primeiro < livreMin + ate.min + cfg.margem) {
+        return vazio({
+          motivo: "O ônibus não chega a tempo neste horário. Ele ainda está na visita anterior.",
+          embarques,
+          embOrigem: embarques[0].hora,
+          estimativa,
+        });
       }
     }
   }
 
   const voltaPontos = [sesc, ...[...stops].reverse()];
-  const volta = await somar(key, voltaPontos, cfg.margem);
-  if (volta == null) return vazio({ pendente: true, motivo: "Não consegui calcular a volta. A solicitação pode seguir e a supervisão confirma o embarque." });
+  const voltaR = await somar(key, voltaPontos, cfg.margem, fonte);
+  const volta = voltaR.total;
+  if (voltaR.estimado) estimativa = true;
 
   const next = doDia.find((v) => v.hora > hora) || null;
-  let retorno = H + cfg.durPadrao;
+  const cheio = H + cfg.durPadrao;
+  let retorno = cheio;
+  let encurtada = false;
   if (next) {
     const destHora = next.embarques[0]?.hora || (horaOk(next.embOrigem) ? next.embOrigem : next.hora);
+    const destMin = toMin(destHora);
     const destEnd = next.embarques[0]?.endereco || next.enderecos[0] || (destHora === next.hora ? cfg.enderecoSesc : "");
-    const dest = destEnd ? await geocode(key, destEnd) : sesc;
-    const extra = await minutos(key, stops[0], dest || sesc);
-    if (extra == null || toMin(destHora) == null) {
-      return vazio({ pendente: true, motivo: "Não consegui calcular a volta. A solicitação pode seguir e a supervisão confirma o embarque." });
+    const dest = destEnd ? await geocode(key, destEnd, sesc) : sesc;
+    const extra = await minutos(key, stops[0], dest || sesc, fonte);
+    if (extra.estimado) estimativa = true;
+    if (destMin != null) {
+      const limite = destMin - volta - extra.min - cfg.margem;
+      if (limite < cheio) {
+        retorno = limite;
+        encurtada = true;
+      }
     }
-    retorno = (toMin(destHora) as number) - volta - extra - cfg.margem;
   }
   const duracao = retorno - H;
-  if (duracao < cfg.durMin) return vazio({ motivo: "O ônibus não chega a tempo neste horário." });
   const embSesc = toHH(retorno);
   const busLivreHora = toHH(retorno + volta);
-  if (!embSesc || !busLivreHora) return vazio({ motivo: "O horário de volta não cabe neste dia." });
-  return {
-    ok: true,
-    pendente: false,
-    motivo: "",
+  const base = {
     embarques,
     embOrigem: embarques[0].hora,
     embSesc,
     fim: embSesc,
-    duracao,
+    duracao: duracao > 0 ? duracao : 0,
     busLivreHora,
     busLivreEndereco: stops[0].endereco,
+    estimativa,
+    encurtada,
   };
+  if (duracao < cfg.durMin || !embSesc || !busLivreHora) {
+    const curto = duracao < cfg.durMin
+      ? "O ônibus não chega a tempo neste horário. A mediação ficaria com " + Math.max(0, duracao) + " min e o mínimo é " + cfg.durMin + " min" + (encurtada ? ", para ainda buscar a próxima visita." : ".")
+      : "O horário de volta não cabe neste dia.";
+    return vazio({ motivo: curto, ...base });
+  }
+  return { ok: true, pendente: false, motivo: "", ...base };
 }
 
 Deno.serve(async (req) => {
@@ -743,6 +883,8 @@ Deno.serve(async (req) => {
     const trechosBus = transporte === "Ônibus do Sesc" && !resultado.pendente
       ? "<p>Embarque na origem: <b>" + html(resultado.embOrigem || "—") + "</b>" +
         (resultado.embSesc ? "<br>Embarque no destino (volta no Sesc): <b>" + html(resultado.embSesc) + "</b>" : "") +
+        (resultado.fim ? "<br>Fim da mediação: <b>" + html(resultado.fim) + "</b>" : "") +
+        (resultado.estimativa ? "<br>O tempo de rua é uma estimativa. A supervisão pode ajustar." : "") +
         "</p>"
       : "";
     const falha = await enviarEmail(
@@ -779,6 +921,8 @@ Deno.serve(async (req) => {
     embSesc: resultado.embSesc,
     fim: resultado.fim,
     duracao: resultado.duracao,
+    estimativa: resultado.estimativa,
+    encurtada: resultado.encurtada,
     emailEnviado,
     emailAviso,
   });
