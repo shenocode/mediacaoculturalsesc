@@ -162,6 +162,82 @@ function dataBR(iso: string) {
   return p.length >= 3 ? p[2] + "/" + p[1] + "/" + p[0] : iso;
 }
 
+function dataFormula(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `=DATA(${y};${m};${d})`;
+}
+
+function serialDe(v: unknown): number | "" {
+  if (typeof v === "number" && v > 20000 && v < 80000) return Math.round(v);
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    return n > 20000 && n < 80000 ? Math.round(n) : "";
+  }
+  const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const y = br ? +br[3] : iso ? +iso[1] : 0;
+  const m = br ? +br[2] : iso ? +iso[2] : 0;
+  const d = br ? +br[1] : iso ? +iso[3] : 0;
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return "";
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569;
+}
+
+function celula(v: unknown) {
+  const t = String(v ?? "").replace(/\r/g, "").replace(/'/g, "’").trim();
+  if (!t) return "";
+  if (/^[=+\-@]/.test(t)) return "'" + t;
+  return t;
+}
+
+const DE_DADOS = "SE('Relatório'!$B$8=\"\";DATA(2000;1;1);'Relatório'!$B$8)";
+const ATE_DADOS = "SE('Relatório'!$D$8=\"\";DATA(2100;12;31);'Relatório'!$D$8)";
+const DE_LOCAL = 'SE($B$8="";DATA(2000;1;1);$B$8)';
+const ATE_LOCAL = 'SE($D$8="";DATA(2100;12;31);$D$8)';
+
+function datasQuery(col: string) {
+  return `${col} >= date '"&TEXTO(${DE_DADOS};"yyyy-mm-dd")&"' and ${col} <= date '"&TEXTO(${ATE_DADOS};"yyyy-mm-dd")&"'`;
+}
+
+function formulaFaixa(col: string) {
+  const n = `CONT.SES(Dados!J2:J500;">="&${DE_DADOS};Dados!J2:J500;"<="&${ATE_DADOS};Dados!Q2:Q500;1)`;
+  const q = (flag: string) => `"select ${col}, sum(L) where ${datasQuery("J")} and ${flag} = 1 group by ${col} order by sum(L) desc limit 8 label ${col} '', sum(L) ''"`;
+  return `=SEERRO(SE(${n}>0;QUERY(Dados!J2:R500;${q("Q")};0);QUERY(Dados!J2:R500;${q("R")};0));{"Sem dados no período"\\0})`;
+}
+
+function formulaContagem(col: string, extra: string) {
+  return `=SEERRO(QUERY(Dados!J2:R500;"select ${col}, count(${col}) where ${datasQuery("J")} ${extra} group by ${col} order by count(${col}) desc limit 8 label ${col} '', count(${col}) ''";0);{"Sem dados no período"\\0})`;
+}
+
+function formulaAcesso() {
+  const cont = (pcd: number) => `CONT.SES(Dados!J2:J500;">="&${DE_DADOS};Dados!J2:J500;"<="&${ATE_DADOS};Dados!R2:R500;1;Dados!P2:P500;${pcd})`;
+  return `=SE(${cont(1)}=0;{"Sem dados no período"\\0};{"Com registro de pessoas com deficiência"\\${cont(1)};"Sem esse registro"\\${cont(0)}})`;
+}
+
+function formulaPublico() {
+  return `=SEERRO(QUERY(Dados!T2:U500;"select U, count(U) where ${datasQuery("T")} group by U order by count(U) desc limit 8 label U '', count(U) ''";0);{"Sem dados no período"\\0})`;
+}
+
+function formulaTotal(col: string, flag: string) {
+  return `=SEERRO(SOMA(FILTER(Dados!${col}2:${col}500;(Dados!A2:A500>=${DE_DADOS})*(Dados!A2:A500<=${ATE_DADOS})*(Dados!${flag}2:${flag}500=1)));0)`;
+}
+
+function formulaCorpo() {
+  const g = `SEERRO(FILTER({TEXTO(Dados!A2:A500;"dd/mm/yyyy")\\Dados!B2:B500\\Dados!C2:C500\\Dados!D2:D500};(Dados!A2:A500>=${DE_LOCAL})*(Dados!A2:A500<=${ATE_LOCAL})*(Dados!G2:G500=1));{"—"\\"—"\\0\\"Nenhum registro ainda"})`;
+  const e = `SEERRO(FILTER({TEXTO(Dados!A2:A500;"dd/mm/yyyy")\\Dados!B2:B500\\Dados!E2:E500\\Dados!F2:F500};(Dados!A2:A500>=${DE_LOCAL})*(Dados!A2:A500<=${ATE_LOCAL})*(Dados!H2:H500=1));{"—"\\"—"\\0\\"Nenhum registro ainda"})`;
+  return `={${g};{"Total"\\""\\Dados!Z1\\""};{""\\""\\""\\""};{"Ativações livres do educativo"\\""\\""\\""};{"Data"\\"Dia da semana"\\"Pessoas"\\"Observação"};${e};{"Total"\\""\\Dados!Z2\\""}}`;
+}
+
+const GRAFICOS_FIXOS = [
+  { titulo: "Faixa etária", formula: () => formulaFaixa("M") },
+  { titulo: "Tipo de instituição", formula: () => formulaFaixa("N") },
+  { titulo: "Situação dos grupos", formula: () => formulaContagem("K", "and K <> 'Solicitado'") },
+  { titulo: "Dia da semana", formula: () => formulaContagem("O", "and R = 1") },
+  { titulo: "Acessibilidade", formula: () => formulaAcesso() },
+  { titulo: "Público das oficinas", formula: () => formulaPublico() },
+];
+
 function agora() {
   const parts = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -257,88 +333,92 @@ function graficos(ags: Record<string, unknown>[], ideias: Record<string, unknown
   return out;
 }
 
-function tabela(linhas: Linha[], mark: Record<string, number>, prefix: string, titulo: string, rows: { data: string; sem: string; n: number; obs: string }[]) {
-  mark[prefix + "Tit"] = linhas.length;
-  linhas.push([titulo, "", "", ""]);
-  mark[prefix + "Head"] = linhas.length;
-  linhas.push(["Data", "Dia da semana", "Pessoas", "Observação"]);
-  mark[prefix + "Ini"] = linhas.length;
-  if (!rows.length) linhas.push(["—", "—", 0, "Nenhum registro ainda"]);
-  else rows.forEach((r) => linhas.push([r.data, r.sem, r.n, r.obs]));
-  mark[prefix + "Fim"] = linhas.length;
-  mark[prefix + "Tot"] = linhas.length;
-  linhas.push(["Total", "", rows.reduce((s, r) => s + r.n, 0), ""]);
+function isoDia(v: unknown) {
+  const d = String(v || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
 }
 
-function montar(ags: Record<string, unknown>[], dias: Map<string, Dia>, ideias: Record<string, unknown>[]) {
+function montarBases(ags: Record<string, unknown>[], dias: Map<string, Dia>, ideias: Record<string, unknown>[]) {
   const porDia = new Map<string, number>();
   const datasGrp = new Set<string>();
   ags.forEach((x) => {
     if (String(x.status || "") !== "Realizado") return;
-    const d = String(x.data || "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const d = isoDia(x.data);
+    if (!d) return;
     datasGrp.add(d);
     const n = alunosDe(x.alunos);
     if (n) porDia.set(d, (porDia.get(d) || 0) + n);
   });
   const datasEsp = new Set<string>();
   dias.forEach((v, d) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    if (!isoDia(d)) return;
     if (v.grpManual || String(v.grpObs || "").trim()) datasGrp.add(d);
     if (v.esp > 0 || String(v.espObs || "").trim()) datasEsp.add(d);
   });
-  const grp = [...datasGrp].sort().map((d) => {
+  const todos = [...new Set([...datasGrp, ...datasEsp])].sort();
+  const linhasDias: Linha[] = [[
+    "Data", "Dia da semana", "Pessoas grupos", "Observação grupos", "Pessoas livres", "Observação livres", "Grupos", "Livres",
+  ]];
+  todos.forEach((d) => {
     const v = dias.get(d);
     const n = v && v.grpManual ? v.grp : Math.round(porDia.get(d) || 0);
-    return { data: dataBR(d), sem: semana(d), n, obs: v?.grpObs || "" };
+    linhasDias.push([
+      dataFormula(d),
+      semana(d),
+      n,
+      celula(v?.grpObs || ""),
+      v?.esp || 0,
+      celula(v?.espObs || ""),
+      datasGrp.has(d) ? 1 : 0,
+      datasEsp.has(d) ? 1 : 0,
+    ]);
   });
-  const esp = [...datasEsp].sort().map((d) => {
-    const v = dias.get(d) || { esp: 0, espObs: "", grp: 0, grpManual: 0, grpObs: "" };
-    return { data: dataBR(d), sem: semana(d), n: v.esp, obs: v.espObs || "" };
+  const linhasAg: Linha[] = [["Data", "Status", "Alunos", "Série", "Tipo", "Dia", "PCD", "Realizado", "Na agenda"]];
+  ags.forEach((x) => {
+    const d = isoDia(x.data);
+    if (!d) return;
+    const status = celula(x.status || "Agendado") || "Agendado";
+    linhasAg.push([
+      dataFormula(d),
+      status,
+      alunosDe(x.alunos),
+      celula(x.serie || "") || "Não informado",
+      celula(x.tipo || "") || "Não informado",
+      diaSemana(d) || "Não informado",
+      String(x.pcd || "").trim() ? 1 : 0,
+      status === "Realizado" ? 1 : 0,
+      naAgenda(status) ? 1 : 0,
+    ]);
   });
-  const linhas: Linha[] = [];
-  const mark: Record<string, number> = {};
-  linhas.push(["MEDIAÇÃO CULTURAL | EDUCATIVO SESC", "", "", ""]);
-  linhas.push(["Relatório de mediação", "", "", ""]);
-  linhas.push(["Exposição Letras & Filetes · todos os registros do painel", "", "", ""]);
-  linhas.push(["Atualizado em " + agora() + " · esta aba é reescrita pelo painel. As anotações da gestão ficam na outra aba.", "", "", ""]);
-  mark.faixa1 = linhas.length;
-  linhas.push(["", "", "", ""]);
-  mark.faixa2 = linhas.length;
-  linhas.push(["", "", "", ""]);
-  linhas.push(["", "", "", ""]);
-  tabela(linhas, mark, "grp", "Visitas de grupos/agendamentos", grp);
-  linhas.push(["", "", "", ""]);
-  tabela(linhas, mark, "esp", "Ativações livres do educativo", esp);
-  linhas.push(["", "", "", ""]);
-  mark.rodape = linhas.length;
-  linhas.push(["Mediação Cultural | Educativo Sesc · Letras & Filetes: Memória Afetiva e Latinidades", "", "", ""]);
-  linhas.push(["", "", "", ""]);
-  mark.graf = linhas.length;
-  linhas.push(["Gráficos", "", "", ""]);
-  for (let i = 0; i < 52; i++) linhas.push(["", "", "", ""]);
-  return { linhas, mark, grp: grp.length, esp: esp.length, blocos: graficos(ags, ideias) };
+  const linhasOfi: Linha[] = [["Data", "Público"]];
+  ideias.forEach((x) => {
+    if (String(x.papel || "") === "cotidiana") return;
+    const st = String(x.status || "");
+    if (st !== "Aprovada" && st !== "Em piloto") return;
+    const d = dataOficina(x);
+    if (!d) return;
+    linhasOfi.push([dataFormula(d), celula(x.publico || "") || "Não informado"]);
+  });
+  return { linhasDias, linhasAg, linhasOfi, grupos: datasGrp.size, livres: datasEsp.size };
 }
 
-function gradeDados(blocos: Bloco[]) {
-  const grid: Linha[] = Array.from({ length: 42 }, () => Array.from({ length: 12 }, () => ""));
-  const refs: { titulo: string; row: number; col: number; n: number }[] = [];
-  blocos.forEach((b, i) => {
-    const col = (i % 3) * 4;
-    const row = Math.floor(i / 3) * 14;
-    grid[row][col] = b.titulo;
-    grid[row + 1][col] = "Rótulo";
-    grid[row + 1][col + 1] = b.unidade;
-    b.fatias.forEach((f, k) => {
-      grid[row + 2 + k][col] = f.label;
-      grid[row + 2 + k][col + 1] = f.n;
-    });
-    refs.push({ titulo: b.titulo, row: row + 2, col, n: b.fatias.length });
-  });
-  return { grid, refs };
+function cabecalhoRelatorio(de: number | "", ate: number | "") {
+  return [
+    ["MEDIAÇÃO CULTURAL | EDUCATIVO SESC", "", "", ""],
+    ["Relatório de mediação", "", "", ""],
+    ["Exposição Letras & Filetes", "", "", ""],
+    ["Atualizado em " + agora() + " · De e Até escolhem o período e não são apagados. Anotações da gestão ficam na outra aba.", "", "", ""],
+    ["", "", "", ""],
+    ["", "", "", ""],
+    ["", "", "", ""],
+    ["De", de, "Até", ate],
+    ["Deixe em branco para ver todos os registros. Ao escolher as datas, tabelas e gráficos mudam na hora.", "", "", ""],
+    ["", "", "", ""],
+    ["Visitas de grupos/agendamentos", "", "", ""],
+    ["Data", "Dia da semana", "Pessoas", "Observação"],
+  ];
 }
-
-function pedidosFormato(sheetId: number, mark: Record<string, number>) {
+function pedidosFormato(sheetId: number) {
   const base = {
     backgroundColor: WHITE,
     textFormat: texto(INK, 11, false),
@@ -347,89 +427,72 @@ function pedidosFormato(sheetId: number, mark: Record<string, number>) {
     wrapStrategy: "WRAP",
   };
   const req: Record<string, unknown>[] = [];
-  req.push({ unmergeCells: { range: caixa(sheetId, 0, 0, 220, 4) } });
-  req.push(fmt(sheetId, 0, 0, 220, 4, base));
-  [0, 1, 2, 3, mark.rodape, mark.graf].forEach((r) => {
-    if (r == null) return;
+  req.push(fmt(sheetId, 0, 0, 80, 4, base));
+  [0, 1, 2, 3, 8, 10].forEach((r) => {
     req.push({ mergeCells: { range: caixa(sheetId, r, 0, r + 1, 4), mergeType: "MERGE_ALL" } });
   });
   req.push(fmt(sheetId, 0, 0, 1, 4, { ...base, textFormat: texto(RED, 11, true) }));
   req.push(fmt(sheetId, 1, 0, 2, 4, { ...base, textFormat: texto(NAVY, 22, true), verticalAlignment: "BOTTOM" }));
   req.push(fmt(sheetId, 2, 0, 3, 4, { ...base, textFormat: texto(MUTED, 12, false) }));
   req.push(fmt(sheetId, 3, 0, 4, 4, { ...base, textFormat: texto(MUTED, 10, false), wrapStrategy: "WRAP" }));
-  req.push(fmt(sheetId, mark.faixa1, 0, mark.faixa1 + 1, 4, { ...base, backgroundColor: RED }));
-  req.push(fmt(sheetId, mark.faixa2, 0, mark.faixa2 + 1, 4, { ...base, backgroundColor: GOLD }));
-  req.push(fmt(sheetId, mark.graf, 0, mark.graf + 1, 4, { ...base, textFormat: texto(NAVY, 16, true) }));
-  req.push(fmt(sheetId, mark.rodape, 0, mark.rodape + 1, 4, { ...base, textFormat: texto(MUTED, 9, false) }));
-  (["grp", "esp"] as const).forEach((p) => {
-    const tit = mark[p + "Tit"];
-    const head = mark[p + "Head"];
-    const ini = mark[p + "Ini"];
-    const fim = mark[p + "Fim"];
-    const tot = mark[p + "Tot"];
-    req.push({ mergeCells: { range: caixa(sheetId, tit, 0, tit + 1, 4), mergeType: "MERGE_ALL" } });
-    req.push(fmt(sheetId, tit, 0, tit + 1, 4, {
-      ...base,
-      textFormat: texto(NAVY, 14, true),
-      borders: { bottom: borda("SOLID_MEDIUM", RED) },
-    }));
-    req.push(fmt(sheetId, head, 0, head + 1, 4, {
-      ...base,
-      backgroundColor: NAVY,
-      textFormat: texto(WHITE, 11, true),
-      borders: {
-        top: borda("SOLID", NAVY),
-        bottom: borda("SOLID", NAVY),
-        left: borda("SOLID", NAVY),
-        right: borda("SOLID", NAVY),
-      },
-    }));
-    req.push(fmt(sheetId, head, 2, head + 1, 3, {
-      ...base,
-      backgroundColor: NAVY,
-      textFormat: texto(WHITE, 11, true),
-      horizontalAlignment: "RIGHT",
-    }));
-    if (fim > ini) {
-      req.push(fmt(sheetId, ini, 0, fim, 4, {
-        ...base,
-        borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
-      }));
-      req.push(fmt(sheetId, ini, 2, fim, 3, {
-        ...base,
-        textFormat: texto(NAVY, 11, true),
-        horizontalAlignment: "RIGHT",
-        numberFormat: { type: "NUMBER", pattern: "0" },
-        borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
-      }));
-    }
-    req.push({ mergeCells: { range: caixa(sheetId, tot, 0, tot + 1, 2), mergeType: "MERGE_ALL" } });
-    req.push(fmt(sheetId, tot, 0, tot + 1, 4, {
-      ...base,
-      backgroundColor: CREAM,
-      textFormat: texto(NAVY, 11, true),
-      borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
-    }));
-    req.push(fmt(sheetId, tot, 2, tot + 1, 3, {
-      ...base,
-      backgroundColor: CREAM,
-      textFormat: texto(NAVY, 11, true),
-      horizontalAlignment: "RIGHT",
-      numberFormat: { type: "NUMBER", pattern: "0" },
-      borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
-    }));
-  });
-  const alturas: [number, number, number][] = [[1, 2, 36], [mark.faixa1, mark.faixa1 + 1, 8], [mark.faixa2, mark.faixa2 + 1, 6]];
-  alturas.forEach(([a, b, px]) => {
+  req.push(fmt(sheetId, 4, 0, 5, 4, { ...base, backgroundColor: RED }));
+  req.push(fmt(sheetId, 5, 0, 6, 4, { ...base, backgroundColor: GOLD }));
+  req.push(fmt(sheetId, 7, 0, 8, 1, { ...base, textFormat: texto(NAVY, 12, true), horizontalAlignment: "RIGHT" }));
+  req.push(fmt(sheetId, 7, 2, 8, 3, { ...base, textFormat: texto(NAVY, 12, true), horizontalAlignment: "RIGHT" }));
+  req.push(fmt(sheetId, 7, 1, 8, 2, {
+    ...base,
+    backgroundColor: CREAM,
+    textFormat: texto(NAVY, 12, true),
+    horizontalAlignment: "CENTER",
+    numberFormat: { type: "DATE", pattern: "dd/mm/yyyy" },
+    borders: { top: borda("SOLID", NAVY), bottom: borda("SOLID", NAVY), left: borda("SOLID", NAVY), right: borda("SOLID", NAVY) },
+  }));
+  req.push(fmt(sheetId, 7, 3, 8, 4, {
+    ...base,
+    backgroundColor: CREAM,
+    textFormat: texto(NAVY, 12, true),
+    horizontalAlignment: "CENTER",
+    numberFormat: { type: "DATE", pattern: "dd/mm/yyyy" },
+    borders: { top: borda("SOLID", NAVY), bottom: borda("SOLID", NAVY), left: borda("SOLID", NAVY), right: borda("SOLID", NAVY) },
+  }));
+  req.push(fmt(sheetId, 8, 0, 9, 4, { ...base, textFormat: texto(MUTED, 10, false), wrapStrategy: "WRAP" }));
+  req.push(fmt(sheetId, 10, 0, 11, 4, {
+    ...base,
+    textFormat: texto(NAVY, 14, true),
+    borders: { bottom: borda("SOLID_MEDIUM", RED) },
+  }));
+  req.push(fmt(sheetId, 11, 0, 12, 4, {
+    ...base,
+    backgroundColor: NAVY,
+    textFormat: texto(WHITE, 11, true),
+  }));
+  req.push(fmt(sheetId, 11, 2, 12, 3, {
+    ...base,
+    backgroundColor: NAVY,
+    textFormat: texto(WHITE, 11, true),
+    horizontalAlignment: "RIGHT",
+  }));
+  req.push(fmt(sheetId, 12, 0, 80, 4, {
+    ...base,
+    borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
+  }));
+  req.push(fmt(sheetId, 12, 2, 80, 3, {
+    ...base,
+    textFormat: texto(NAVY, 11, true),
+    horizontalAlignment: "RIGHT",
+    numberFormat: { type: "NUMBER", pattern: "0" },
+    borders: { top: borda("SOLID"), bottom: borda("SOLID"), left: borda("SOLID"), right: borda("SOLID") },
+  }));
+  [[1, 2, 36], [4, 5, 8], [5, 6, 6], [7, 8, 32]].forEach(([i, f, px]) => {
     req.push({
       updateDimensionProperties: {
-        range: { sheetId, dimension: "ROWS", startIndex: a, endIndex: b },
+        range: { sheetId, dimension: "ROWS", startIndex: i, endIndex: f },
         properties: { pixelSize: px },
         fields: "pixelSize",
       },
     });
   });
-  [[0, 140], [1, 180], [2, 110], [3, 360]].forEach(([i, px]) => {
+  [[0, 140], [1, 150], [2, 130], [3, 320]].forEach(([i, px]) => {
     req.push({
       updateDimensionProperties: {
         range: { sheetId, dimension: "COLUMNS", startIndex: i, endIndex: i + 1 },
@@ -438,52 +501,66 @@ function pedidosFormato(sheetId: number, mark: Record<string, number>) {
       },
     });
   });
+  [1, 3].forEach((col) => {
+    req.push({
+      setDataValidation: {
+        range: caixa(sheetId, 7, col, 8, col + 1),
+        rule: { condition: { type: "DATE_IS_VALID" }, strict: false, showCustomUi: true },
+      },
+    });
+  });
   req.push({
     updateSheetProperties: {
-      properties: { sheetId, tabColor: RED, gridProperties: { hideGridlines: true, frozenRowCount: 6 } },
+      properties: { sheetId, tabColor: RED, gridProperties: { hideGridlines: true, frozenRowCount: 8 } },
       fields: "tabColor,gridProperties.hideGridlines,gridProperties.frozenRowCount",
     },
   });
   return req;
 }
 
-function pedidosGraficos(relId: number, dadosId: number, refs: { titulo: string; row: number; col: number; n: number }[], anchor: number) {
-  return refs.map((ref, i) => ({
+function regraCond(sheetId: number, formula: string, format: Record<string, unknown>) {
+  return {
+    addConditionalFormatRule: {
+      rule: {
+        ranges: [caixa(sheetId, 12, 0, 400, 4)],
+        booleanRule: {
+          condition: { type: "CUSTOM_FORMULA", values: [{ userEnteredValue: formula }] },
+          format,
+        },
+      },
+      index: 0,
+    },
+  };
+}
+
+function pedidosGraficos(relId: number, dadosId: number) {
+  return GRAFICOS_FIXOS.map((g, i) => ({
     addChart: {
       chart: {
         spec: {
-          title: ref.titulo,
+          title: g.titulo,
           titleTextFormat: texto(NAVY, 12, true),
           fontName: "Arial",
           backgroundColor: WHITE,
           pieChart: {
             legendPosition: "RIGHT_LEGEND",
-            domain: {
-              sourceRange: {
-                sources: [caixa(dadosId, ref.row, ref.col, ref.row + ref.n, ref.col + 1)],
-              },
-            },
-            series: {
-              sourceRange: {
-                sources: [caixa(dadosId, ref.row, ref.col + 1, ref.row + ref.n, ref.col + 2)],
-              },
-            },
+            domain: { sourceRange: { sources: [caixa(dadosId, 1 + i * 14, 22, 9 + i * 14, 23)] } },
+            series: { sourceRange: { sources: [caixa(dadosId, 1 + i * 14, 23, 9 + i * 14, 24)] } },
           },
         },
         position: {
           overlayPosition: {
-            anchorCell: { sheetId: relId, rowIndex: anchor + 1 + Math.floor(i / 2) * 16, columnIndex: (i % 2) * 5 },
-            offsetXPixels: 4,
-            offsetYPixels: 4,
-            widthPixels: 460,
-            heightPixels: 268,
+            anchorCell: { sheetId: relId, rowIndex: 10 + Math.floor(i / 2) * 16, columnIndex: 5 + (i % 2) * 5 },
+            offsetXPixels: 8,
+            offsetYPixels: 8,
+            widthPixels: 420,
+            heightPixels: 250,
           },
         },
       },
     },
   }));
 }
-
 async function lerTudo(admin: ReturnType<typeof createClient>, path: string) {
   const out: Record<string, unknown>[] = [];
   for (let from = 0; from < 20000; from += 1000) {
@@ -543,11 +620,10 @@ Deno.serve(async (req) => {
         grpObs: String(row.grpObs || ""),
       });
     });
-    const doc = montar(ags, dias, ideias);
-    const dados = gradeDados(doc.blocos);
+    const bases = montarBases(ags, dias, ideias);
 
-    let meta = await gfetch(base + "?fields=sheets(properties,charts(chartId))", access) as {
-      sheets?: { properties: { sheetId: number; title: string }; charts?: { chartId: number }[] }[];
+    let meta = await gfetch(base + "?fields=sheets(properties,charts(chartId),conditionalFormats)", access) as {
+      sheets?: { properties: { sheetId: number; title: string }; charts?: { chartId: number }[]; conditionalFormats?: unknown[] }[];
     };
     const titles = () => new Map((meta.sheets || []).map((s) => [s.properties.title, s]));
     let abas = titles();
@@ -566,13 +642,23 @@ Deno.serve(async (req) => {
     if (!abas.has(ABA_NOTAS)) garantir.push({ addSheet: { properties: { title: ABA_NOTAS, tabColor: GOLD } } });
     if (garantir.length) {
       await gfetch(base + ":batchUpdate", access, { method: "POST", body: JSON.stringify({ requests: garantir }) });
-      meta = await gfetch(base + "?fields=sheets(properties,charts(chartId))", access) as typeof meta;
+      meta = await gfetch(base + "?fields=sheets(properties,charts(chartId),conditionalFormats)", access) as typeof meta;
       abas = titles();
     }
     const rel = abas.get(ABA_REL);
     const dadosAba = abas.get(ABA_DADOS);
     const notasAba = abas.get(ABA_NOTAS);
     if (!rel || !dadosAba || !notasAba) throw new Error("Não foi possível preparar as abas da planilha.");
+
+    let de: number | "" = "";
+    let ate: number | "" = "";
+    try {
+      const per = await gfetch(base + "/values/" + encodeURIComponent("'" + ABA_REL + "'!B8:D8") + "?valueRenderOption=UNFORMATTED_VALUE", access) as { values?: unknown[][] };
+      const row = per.values?.[0] || [];
+      de = serialDe(row[0]);
+      ate = serialDe(row[2]);
+      if (de !== "" && ate !== "" && de > ate) { const tmp = de; de = ate; ate = tmp; }
+    } catch { /* a planilha ainda não tem o período */ }
 
     let notasVazias = false;
     try {
@@ -582,20 +668,38 @@ Deno.serve(async (req) => {
       notasVazias = true;
     }
 
+    await gfetch(base + ":batchUpdate", access, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          { updateSpreadsheetProperties: { properties: { locale: "pt_BR", timeZone: "America/Sao_Paulo" }, fields: "locale,timeZone" } },
+          { unmergeCells: { range: caixa(rel.properties.sheetId, 0, 0, 400, 4) } },
+        ],
+      }),
+    });
     await gfetch(base + "/values:batchClear", access, {
       method: "POST",
-      body: JSON.stringify({ ranges: ["'" + ABA_REL + "'!A1:D220", "'" + ABA_DADOS + "'!A1:L42"] }),
+      body: JSON.stringify({ ranges: ["'" + ABA_REL + "'!A1:D400", "'" + ABA_DADOS + "'!A1:Z600"] }),
     });
     const data: { range: string; values: Linha[] }[] = [
-      { range: "'" + ABA_REL + "'!A1", values: doc.linhas },
-      { range: "'" + ABA_DADOS + "'!A1", values: dados.grid },
+      { range: "'" + ABA_REL + "'!A1", values: cabecalhoRelatorio(de, ate) },
+      { range: "'" + ABA_REL + "'!A13", values: [[formulaCorpo()]] },
+      { range: "'" + ABA_DADOS + "'!A1", values: bases.linhasDias },
+      { range: "'" + ABA_DADOS + "'!J1", values: bases.linhasAg },
+      { range: "'" + ABA_DADOS + "'!T1", values: bases.linhasOfi },
+      { range: "'" + ABA_DADOS + "'!Z1", values: [[formulaTotal("C", "G")], [formulaTotal("E", "H")]] },
     ];
+    GRAFICOS_FIXOS.forEach((g, i) => {
+      const row = 1 + i * 14;
+      data.push({ range: "'Dados'!W" + row, values: [[g.titulo]] });
+      data.push({ range: "'Dados'!W" + (row + 1), values: [[g.formula()]] });
+    });
     if (notasVazias) {
       data.push({
         range: "'" + ABA_NOTAS + "'!A1",
         values: [
           ["Anotações da gestão", "", ""],
-          ["Esta aba é de vocês. O painel não apaga o que for escrito aqui. A aba Relatório é atualizada sozinha quando uma visita é marcada como Realizado ou quando uma ativação livre é lançada.", "", ""],
+          ["Esta aba é de vocês. O painel não apaga o que for escrito aqui. A aba Relatório é atualizada sozinha quando uma visita é marcada como Realizado ou quando uma ativação livre é lançada. De e Até, na aba Relatório, escolhem o período.", "", ""],
           ["", "", ""],
           ["Data", "Tema", "Anotação"],
         ],
@@ -603,12 +707,17 @@ Deno.serve(async (req) => {
     }
     await gfetch(base + "/values:batchUpdate", access, {
       method: "POST",
-      body: JSON.stringify({ valueInputOption: "RAW", data }),
+      body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),
     });
 
-    const req = pedidosFormato(rel.properties.sheetId, doc.mark);
+    const req = pedidosFormato(rel.properties.sheetId);
+    const regras = rel.conditionalFormats || [];
+    for (let i = regras.length - 1; i >= 0; i--) req.push({ deleteConditionalFormatRule: { sheetId: rel.properties.sheetId, index: i } });
+    req.push(regraCond(rel.properties.sheetId, '=$A13="Total"', { backgroundColor: CREAM, textFormat: { bold: true, foregroundColor: NAVY } }));
+    req.push(regraCond(rel.properties.sheetId, '=$A13="Data"', { backgroundColor: NAVY, textFormat: { bold: true, foregroundColor: WHITE } }));
+    req.push(regraCond(rel.properties.sheetId, '=$A13="Ativações livres do educativo"', { backgroundColor: WHITE, textFormat: { bold: true, foregroundColor: NAVY } }));
     (rel.charts || []).forEach((c) => req.push({ deleteEmbeddedObject: { objectId: c.chartId } }));
-    pedidosGraficos(rel.properties.sheetId, dadosAba.properties.sheetId, dados.refs, doc.mark.graf).forEach((c) => req.push(c));
+    pedidosGraficos(rel.properties.sheetId, dadosAba.properties.sheetId).forEach((c) => req.push(c));
     if (notasVazias) {
       const id = notasAba.properties.sheetId;
       const baseFmt = {
@@ -650,7 +759,7 @@ Deno.serve(async (req) => {
       });
     }
     await gfetch(base + ":batchUpdate", access, { method: "POST", body: JSON.stringify({ requests: req }) });
-    return json({ ok: true, grupos: doc.grp, livres: doc.esp, graficos: doc.blocos.length });
+    return json({ ok: true, grupos: bases.grupos, livres: bases.livres, graficos: GRAFICOS_FIXOS.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Não foi possível atualizar a planilha.";
     const status = /chave|incompleta|não está no servidor/i.test(msg) ? 500 : 502;
