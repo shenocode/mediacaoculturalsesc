@@ -121,7 +121,8 @@
   }
   function slotHtml(v) {
     var atual = typeof v === 'string' ? v : '';
-    return '<label>Horário da visita no Sesc<select name=hora data-slot data-atual="' + esc(atual) + '"><option value="">Selecione…</option></select></label>';
+    var id = 'hs-' + Math.random().toString(36).slice(2, 9);
+    return '<label>Horário da visita no Sesc<input name=hora type=time step=60 data-slot data-atual="' + esc(atual) + '" value="' + esc(atual) + '" list="' + id + '"><datalist id="' + id + '"></datalist></label><p class=mut data-slothint>Sugestões da grade do dia; você também pode digitar outro horário (ex.: 15:30).</p>';
   }
   function endsHtml(v) {
     var list = Array.isArray(v) ? v.filter(Boolean) : [];
@@ -155,7 +156,7 @@
       if (atual && horas.indexOf(atual) < 0) horas.push(atual);
       var visitas = (API.visitas ? API.visitas() : []).filter(function (v) { return v.data === dia && OCUPA[v.status || 'Agendado']; });
       var dur = cfgAtual().durPadrao;
-      var html = '<option value="">Selecione…</option>' + horas.map(function (h) {
+      var html = horas.map(function (h) {
         var ocup = visitas.some(function (v) {
           if (v.id === vid) return false;
           if (v.hora === h) return true;
@@ -166,9 +167,14 @@
           if (fim == null || fim <= ini) fim = ini + dur;
           return slot >= ini && slot < fim;
         });
-        return '<option value="' + h + '"' + (h === atual ? ' selected' : '') + (ocup ? ' disabled' : '') + '>' + h + (ocup ? ' (reservado)' : '') + '</option>';
+        return '<option value="' + h + '">' + h + (ocup ? ' (reservado)' : '') + '</option>';
       }).join('');
-      if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; if (atual) sel.value = atual; }
+      var list = sel.list || (sel.getAttribute('list') ? document.getElementById(sel.getAttribute('list')) : null);
+      if (list && list.dataset.sig !== html) { list.innerHTML = html; list.dataset.sig = html; }
+      if (atual && document.activeElement !== sel && sel.value !== atual) sel.value = atual;
+      if (sel.value) sel.dataset.atual = sel.value;
+      var hint = f.querySelector('[data-slothint]');
+      if (hint) hint.hidden = !horas.length;
     }
     var on = f.elements.transporte && f.elements.transporte.value === 'Ônibus do Sesc';
     var varios = f.elements.varios && f.elements.varios.checked;
@@ -457,14 +463,16 @@
     var op = horas.slice();
     box.innerHTML = lista.map(function (v) {
       var opts = op.indexOf(v.hora) < 0 ? [v.hora].concat(op) : op.slice();
-      return '<div class=it><div><b>' + esc(v.escola || 'Grupo') + '</b> <span class=tag>' + esc(v.status || '') + '</span><div class=mut>' + esc(v.transporte || '') + (v.logisticaManual ? ' · horário ajustado à mão' : '') + '</div></div><label>Início da mediação<select data-movsel="' + esc(v.id) + '">' + opts.map(function (h) { return '<option' + (h === v.hora ? ' selected' : '') + '>' + esc(h) + '</option>'; }).join('') + '</select></label><button type=button class="btn g" data-logact=mover data-id="' + esc(v.id) + '">Mover</button></div>';
+      var lid = 'mv-' + String(v.id || '').replace(/[^a-zA-Z0-9_-]/g, '') + '-' + Math.random().toString(36).slice(2, 6);
+      return '<div class=it><div><b>' + esc(v.escola || 'Grupo') + '</b> <span class=tag>' + esc(v.status || '') + '</span><div class=mut>' + esc(v.transporte || '') + (v.logisticaManual ? ' · horário ajustado à mão' : '') + '</div></div><label>Início da mediação<input type=time step=60 data-movsel="' + esc(v.id) + '" value="' + esc(v.hora || '') + '" list="' + lid + '"><datalist id="' + lid + '">' + opts.map(function (h) { return '<option value="' + esc(h) + '">'; }).join('') + '</datalist></label><button type=button class="btn g" data-logact=mover data-id="' + esc(v.id) + '">Mover</button></div>';
     }).join('');
   }
   async function mover(id) {
     var sel = document.querySelector('[data-movsel="' + CSS.escape(id) + '"]');
-    var hora = sel ? sel.value : '';
+    var hora = sel ? String(sel.value || '').trim() : '';
     var v = (API.visitas ? API.visitas() : []).find(function (x) { return x.id === id; });
-    if (!v || !horaOk(hora)) return;
+    if (!v) return;
+    if (!horaOk(hora)) return avisar('Informe o horário no formato 15:30.');
     if (hora === v.hora) return avisar('Esse já é o horário da visita.');
     if (v.logisticaManual && API.ask) {
       var ok = await API.ask('Esta visita está com embarque ajustado à mão. Mover o horário recalcula e substitui esse ajuste.');
@@ -610,6 +618,11 @@
     if (!f) return;
     if (f.id === 'logcfg' || f.id === 'logmail') f.dataset.user = '1';
     if (e.target.name === 'fim' && !e.target.readOnly) e.target.dataset.user = '1';
+    if (e.target.name === 'hora' && e.target.dataset && e.target.dataset.slot != null) {
+      e.target.dataset.atual = e.target.value || '';
+      sugerirFimProprio(f);
+      prever(f);
+    }
     if (e.target.name === 'end') {
       clearTimeout(atualizarMapa._t);
       atualizarMapa._t = setTimeout(function () { atualizarMapa(f); }, 400);
