@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.logistica-visita]
 verify_jwt = false
+
+[functions.sincronizar-planilha]
+verify_jwt = true

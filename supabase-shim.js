@@ -105,6 +105,48 @@
     };
   }
 
+  var PLANILHA_PATHS = { agendamentos: 1, ideias: 1, relatorio_dias: 1 };
+  var PLANILHA_PULA = { hora: 1, fim: 1, embOrigem: 1, embSesc: 1, embarques: 1, busLivreHora: 1, busLivreEndereco: 1, logisticaPendente: 1, logisticaManual: 1, logisticaMotivo: 1 };
+  var planilhaTimer = null, planilhaFila = false, planilhaRodando = false, planilhaAvisou = '', planilhaAvisouEm = 0;
+  function planilhaAvisar(msg) {
+    var agora = Date.now();
+    if (!msg || (msg === planilhaAvisou && agora - planilhaAvisouEm < 60000)) return;
+    planilhaAvisou = msg;
+    planilhaAvisouEm = agora;
+    try { if (typeof window.painelPlanilhaAviso === 'function') window.painelPlanilhaAviso(msg); } catch (e) {}
+  }
+  function planilhaTocar(path, patch) {
+    if (!PLANILHA_PATHS[path] || !ME || (ME.role !== 'supervisao' && ME.role !== 'equipe')) return;
+    if (patch) {
+      var keys = Object.keys(patch);
+      if (keys.length && keys.every(function (k) { return PLANILHA_PULA[k]; })) return;
+    }
+    clearTimeout(planilhaTimer);
+    planilhaTimer = setTimeout(planilhaEnviar, 1200);
+  }
+  async function planilhaEnviar() {
+    if (planilhaRodando) { planilhaFila = true; return; }
+    if (!ME || (ME.role !== 'supervisao' && ME.role !== 'equipe')) return;
+    planilhaRodando = true;
+    try {
+      var session = (await sb.auth.getSession()).data.session;
+      if (!session) return;
+      var r = await fetch(CFG.SUPABASE_URL + '/functions/v1/sincronizar-planilha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: CFG.SUPABASE_ANON_KEY },
+        body: '{}'
+      });
+      var j = {};
+      try { j = await r.json(); } catch (e) {}
+      if (!r.ok) planilhaAvisar(j.error || 'A planilha da gestão não atualizou.');
+    } catch (e) {
+      planilhaAvisar('A planilha da gestão não atualizou.');
+    } finally {
+      planilhaRodando = false;
+      if (planilhaFila) { planilhaFila = false; planilhaTimer = setTimeout(planilhaEnviar, 800); }
+    }
+  }
+
   function docRef(path, id) {
     id = String(id);
     var user = isUserPath(path);
@@ -122,6 +164,7 @@
         if (user) await ok(sb.from('user_docs').upsert({ owner: path.slice(USER_PREFIX.length), id: id, data: body, updated_at: new Date().toISOString() }));
         else await ok(sb.from('docs').upsert({ path: path, id: id, data: body, updated_at: new Date().toISOString() }));
         if (subs[path] && subs[path].size) { cache(path).set(id, body); emit(path); }
+        if (!user) planilhaTocar(path, null);
       },
       update: async function (d) {
         var s = splitDel(d);
@@ -132,11 +175,13 @@
           s.del.forEach(function (k) { delete cur[k]; });
           cache(path).set(id, cur); emit(path);
         }
+        if (!user) planilhaTocar(path, s.patch);
       },
       delete: async function () {
         if (user) await ok(sb.from('user_docs').delete().eq('owner', path.slice(USER_PREFIX.length)).eq('id', id));
         else await ok(sb.from('docs').delete().eq('path', path).eq('id', id));
         if (subs[path] && subs[path].size) { cache(path).delete(id); emit(path); }
+        if (!user) planilhaTocar(path, null);
       }
     };
   }
@@ -309,6 +354,7 @@
     ME = p;
     var box = document.getElementById('pm-login'); if (box) box.remove();
     if (started && ev === 'SIGNED_IN' && !same) { location.reload(); return; }
+    if (!same && (p.role === 'equipe' || p.role === 'supervisao')) setTimeout(planilhaEnviar, 2500);
     boot();
   }
 
