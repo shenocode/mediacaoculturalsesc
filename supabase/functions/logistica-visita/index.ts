@@ -738,70 +738,14 @@ Deno.serve(async (req) => {
     const { data: row } = await admin.from("docs").select("id,data").eq("path", "agendamentos").eq("id", id).maybeSingle();
     if (!row) return json({ error: "Visita não encontrada." }, 404);
     const ficha = { ...((row.data || {}) as Record<string, unknown>) };
-    const emailInst = texto(ficha.email, 120).toLowerCase();
-    if (!emailOk(emailInst)) return json({ error: "A visita não tem e-mail da instituição para enviar o ofício." }, 400);
-    if (ficha.oficioEnviado === true && body.forcar !== true && body.forcar !== "true") {
-      if (ficha.status !== "Confirmado") {
-        await admin.from("docs").update({
-          data: { ...ficha, status: "Confirmado" },
-        }).eq("path", "agendamentos").eq("id", id);
-      }
-      return json({ ok: true, jaEnviado: true, emailAviso: "O ofício desta visita já tinha sido enviado." });
+    // Envio do ofício por e-mail desabilitado temporariamente; só confirma o status.
+    if (ficha.status !== "Confirmado") {
+      const { error: upErr } = await admin.from("docs").update({
+        data: { ...ficha, status: "Confirmado" },
+      }).eq("path", "agendamentos").eq("id", id);
+      if (upErr) return json({ error: "Não deu para marcar a visita como confirmada." }, 500);
     }
-    const { data: chaveEmail } = await admin.rpc("chave_resend");
-    const resend = typeof chaveEmail === "string" ? chaveEmail.trim() : "";
-    if (resend.length < 20) return json({ error: "Ative o envio de e-mail (chave do Resend) antes de confirmar." }, 400);
-    const { data: aviso } = await admin.rpc("aviso_visita");
-    const caixa = aviso && typeof aviso === "object" ? aviso as { email?: string; de?: string } : {};
-    const de = texto(caixa.de, 160) || REMETENTE;
-    const inbox = texto(caixa.email, 120).toLowerCase();
-    const emailDevolucao = emailOk(inbox) ? inbox : "";
-    ficha.status = "Confirmado";
-    const pdf = oficioPdf(ficha, emailDevolucao);
-    const quando = dataBr(texto(ficha.data, 10)) + " às " + texto(ficha.hora, 5);
-    const escola = texto(ficha.escola, 160);
-    const corpo =
-      "<p>A visita de <b>" + html(escola) + "</b> em " + html(quando) + " foi <b>confirmada</b> pela mediação cultural do Sesc Piracicaba.</p>" +
-      "<p>Em anexo está o <b>ofício</b> com os dados do agendamento.</p>" +
-      "<p><b>O que fazer agora:</b></p>" +
-      "<ol>" +
-      "<li>Imprima o ofício no <b>papel timbrado</b> da instituição.</li>" +
-      "<li>Assine e carimbe o documento.</li>" +
-      "<li>Digitalize (foto nítida ou PDF) e envie por e-mail para <b>" + html(emailDevolucao || "o e-mail informado pela supervisão") + "</b>.</li>" +
-      "</ol>" +
-      (emailDevolucao ? "<p>E-mail para devolução do ofício assinado: <b>" + html(emailDevolucao) + "</b></p>" : "") +
-      "<p>Guarde o comprovante de envio até a data da visita.</p>";
-    const falha = await enviarEmail(
-      resend,
-      de,
-      emailInst,
-      "Visita confirmada — ofício para assinatura · Sesc Piracicaba",
-      corpo,
-      [{ filename: "oficio-visita-" + texto(ficha.data, 10) + ".pdf", content: bytesB64(pdf), contentType: "application/pdf" }],
-    );
-    if (falha) return json({ error: "Não foi possível enviar o ofício: " + falha }, 502);
-    const agora = new Date().toISOString();
-    const { error: upErr } = await admin.from("docs").update({
-      data: { ...ficha, status: "Confirmado", oficioEnviado: true, oficioEnviadoEm: agora },
-    }).eq("path", "agendamentos").eq("id", id);
-    if (upErr) return json({ error: "O e-mail saiu, mas não deu para marcar a visita como confirmada. Atualize o status manualmente." }, 500);
-    if (emailOk(inbox) && inbox !== emailInst) {
-      await enviarEmail(
-        resend,
-        de,
-        inbox,
-        "Ofício enviado — " + escola,
-        "<p>O ofício de confirmação foi enviado para <b>" + html(emailInst) + "</b>.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "</p><p>A instituição deve devolver o documento assinado e carimbado neste e-mail.</p>",
-      );
-    }
-    return json({
-      ok: true,
-      id,
-      status: "Confirmado",
-      emailEnviado: true,
-      emailAviso: "Enviamos a confirmação com o ofício para " + emailInst + ".",
-      emailDevolucao,
-    });
+    return json({ ok: true, id, status: "Confirmado", emailEnviado: false });
   }
 
   if (acao !== "calcular" && acao !== "enviar") return json({ error: "Ação desconhecida." }, 400);
@@ -894,7 +838,7 @@ Deno.serve(async (req) => {
       "Recebemos sua solicitação de agendamento — Sesc Piracicaba",
       "<p>Recebemos a solicitação de agendamento de <b>" + html(escola) + "</b> para " + html(quando) + ".</p>" +
         trechosBus +
-        "<p>Sua solicitação <b>reservou o horário</b> e será analisada pela supervisão da mediação cultural. Em breve você recebe informações se a visita está confirmada. Quando confirmada, o ofício para assinatura chega por e-mail.</p>",
+        "<p>Sua solicitação <b>reservou o horário</b> e será analisada pela supervisão da mediação cultural. Em breve você recebe informações se a visita está confirmada.</p>",
     );
     emailEnviado = !falha;
     emailAviso = falha
@@ -906,7 +850,7 @@ Deno.serve(async (req) => {
         de,
         inbox,
         "Nova solicitação de agendamento — " + escola,
-        "<p>Chegou uma solicitação com status <b>Solicitado</b>. O horário já está reservado. Confira os dados e, se estiver tudo certo, mude o status para <b>Confirmado</b> para enviar o ofício à instituição.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
+        "<p>Chegou uma solicitação com status <b>Solicitado</b>. O horário já está reservado. Confira os dados e, se estiver tudo certo, mude o status para <b>Confirmado</b>.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
       );
     }
   } else {
