@@ -200,10 +200,11 @@ function datasQuery(col: string) {
   return `${col} >= date '"&TEXTO(${DE_DADOS};"yyyy-mm-dd")&"' and ${col} <= date '"&TEXTO(${ATE_DADOS};"yyyy-mm-dd")&"'`;
 }
 
-function formulaFaixa(col: string) {
+function formulaFaixa(col: string, limite = 8) {
   const n = `CONT.SES(Dados!J2:J500;">="&${DE_DADOS};Dados!J2:J500;"<="&${ATE_DADOS};Dados!Q2:Q500;1)`;
-  const q = (flag: string) => `"select ${col}, sum(L) where ${datasQuery("J")} and ${flag} = 1 group by ${col} order by sum(L) desc limit 8 label ${col} '', sum(L) ''"`;
-  return `=SEERRO(SE(${n}>0;QUERY(Dados!J2:R500;${q("Q")};0);QUERY(Dados!J2:R500;${q("R")};0));{"Sem dados no período"\\0})`;
+  const ate = col === "S" ? "S" : "R";
+  const q = (flag: string) => `"select ${col}, sum(L) where ${datasQuery("J")} and ${flag} = 1 group by ${col} order by sum(L) desc limit ${limite} label ${col} '', sum(L) ''"`;
+  return `=SEERRO(SE(${n}>0;QUERY(Dados!J2:${ate}500;${q("Q")};0);QUERY(Dados!J2:${ate}500;${q("R")};0));{"Sem dados no período"\\0})`;
 }
 
 function formulaContagem(col: string, extra: string) {
@@ -219,6 +220,11 @@ function formulaPublico() {
   return `=SEERRO(QUERY(Dados!T2:U500;"select U, count(U) where ${datasQuery("T")} group by U order by count(U) desc limit 8 label U '', count(U) ''";0);{"Sem dados no período"\\0})`;
 }
 
+function comLegenda(formula: string) {
+  const corpo = formula.replace(/^=/, "");
+  return `=LET(q;${corpo};SE(SOMA(ÍNDICE(q;;2))=0;q;{ARRAYFORMULA(ÍNDICE(q;;1)&" · "&TEXTO(ÍNDICE(q;;2)/SOMA(ÍNDICE(q;;2));"0.0%"))\\ÍNDICE(q;;2)}))`;
+}
+
 function formulaTotal(col: string, flag: string) {
   return `=SEERRO(SOMA(FILTER(Dados!${col}2:${col}500;(Dados!A2:A500>=${DE_DADOS})*(Dados!A2:A500<=${ATE_DADOS})*(Dados!${flag}2:${flag}500=1)));0)`;
 }
@@ -230,7 +236,7 @@ function formulaCorpo() {
 }
 
 const GRAFICOS_FIXOS = [
-  { titulo: "Faixa etária", formula: () => formulaFaixa("M") },
+  { titulo: "Faixa etária", formula: () => formulaFaixa("S", 12) },
   { titulo: "Tipo de instituição", formula: () => formulaFaixa("N") },
   { titulo: "Situação dos grupos", formula: () => formulaContagem("K", "and K <> 'Solicitado'") },
   { titulo: "Dia da semana", formula: () => formulaContagem("O", "and R = 1") },
@@ -249,6 +255,50 @@ function agora() {
   }).formatToParts(new Date());
   const p = (t: string) => parts.find((x) => x.type === t)?.value || "";
   return p("day") + "/" + p("month") + "/" + p("year") + " às " + p("hour") + ":" + p("minute");
+}
+
+function idadeTxt(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9+ ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function faixaEtaria(raw: unknown) {
+  const n = idadeTxt(String(raw || ""));
+  if (!n || /nao inform|sem inform|nao consta/.test(n)) return "Não informado";
+  if (/\bidos/.test(n) || /60\s*\+|acima de 60|mais de 60|a partir de 60/.test(n)) return "60 anos ou mais";
+  if (/30\s*\+|acima de 30|mais de 30|a partir de 30/.test(n)) return "Adultos";
+  if (/\b(adultos?|docentes?|professores?)\b/.test(n) && !/\d/.test(n)) return "Adultos";
+  const nums = [...n.matchAll(/\d+/g)].map((m) => +m[0]).filter((x) => x >= 0 && x <= 120);
+  if (!nums.length) {
+    if (/\badult|docente|professor/.test(n)) return "Adultos";
+    if (/\bjovem/.test(n)) return "14 a 24 anos";
+    if (/infantil|crianc/.test(n)) return "4 a 6 anos";
+    return "Variados";
+  }
+  const lo = Math.min(...nums), hi = Math.max(...nums);
+  if ((lo < 18 && hi >= 30) || hi - lo >= 25) return "Variados";
+  if (lo <= 17 && hi >= 18 && hi < 30) return hi <= 18 && lo >= 15 ? "15 a 17 anos" : "14 a 24 anos";
+  if (lo >= 60) return "60 anos ou mais";
+  if (lo >= 30 && hi < 60) return "Adultos";
+  if (lo >= 30) return "Variados";
+  if (hi <= 3) return "Até 3 anos";
+  const bands: [number, number, string][] = [[4, 6, "4 a 6 anos"], [7, 11, "6 a 11 anos"], [12, 14, "11 a 14 anos"], [15, 17, "15 a 17 anos"], [18, 29, "18 a 29 anos"], [30, 59, "Adultos"], [60, 120, "60 anos ou mais"]];
+  const score = bands.map(() => 0);
+  for (let a = lo; a <= hi; a++) {
+    const i = bands.findIndex(([b, c]) => a >= b && a <= c);
+    if (i >= 0) score[i]++;
+  }
+  let best = 0;
+  score.forEach((v, i) => { if (v > score[best]) best = i; });
+  if (!score[best]) return "Variados";
+  let second = -1;
+  score.forEach((v, i) => { if (i !== best && (second < 0 || v > score[second])) second = i; });
+  if (second >= 0 && score[second] === score[best]) {
+    const i1 = Math.min(best, second), i2 = Math.max(best, second);
+    if (bands[i2][0] - bands[i1][1] <= 1 && bands[i2][1] <= 17) return lo + " a " + hi + " anos";
+    return "Variados";
+  }
+  if (score[best] * 2 < hi - lo + 1) return "Variados";
+  return bands[best][2];
 }
 
 function alunosDe(v: unknown) {
@@ -318,7 +368,7 @@ function graficos(ags: Record<string, unknown>[], ideias: Record<string, unknown
   const add = (titulo: string, unidade: string, slices: Fatia[]) => {
     if (slices.length) out.push({ titulo, unidade, fatias: slices });
   };
-  add("Faixa etária (" + quem + ")", "pessoas", somar(base, (x) => String(x.serie || ""), pessoas));
+  add("Faixa etária (" + quem + ")", "pessoas", somar(base, (x) => faixaEtaria(x.serie), pessoas));
   add("Tipo de instituição (" + quem + ")", "pessoas", somar(base, (x) => String(x.tipo || ""), pessoas));
   add("Situação dos grupos", "grupos", somar(ag.concat(cancel), (x) => String(x.status || "Agendado"), () => 1));
   add("Dia da semana", "grupos", somar(ag, (x) => diaSemana(String(x.data || "")), () => 1));
@@ -373,7 +423,7 @@ function montarBases(ags: Record<string, unknown>[], dias: Map<string, Dia>, ide
       datasEsp.has(d) ? 1 : 0,
     ]);
   });
-  const linhasAg: Linha[] = [["Data", "Status", "Alunos", "Série", "Tipo", "Dia", "PCD", "Realizado", "Na agenda"]];
+  const linhasAg: Linha[] = [["Data", "Status", "Alunos", "Série", "Tipo", "Dia", "PCD", "Realizado", "Na agenda", "Faixa"]];
   ags.forEach((x) => {
     const d = isoDia(x.data);
     if (!d) return;
@@ -388,6 +438,7 @@ function montarBases(ags: Record<string, unknown>[], dias: Map<string, Dia>, ide
       String(x.pcd || "").trim() ? 1 : 0,
       status === "Realizado" ? 1 : 0,
       naAgenda(status) ? 1 : 0,
+      faixaEtaria(x.serie),
     ]);
   });
   const linhasOfi: Linha[] = [["Data", "Público"]];
@@ -534,32 +585,36 @@ function regraCond(sheetId: number, formula: string, format: Record<string, unkn
 }
 
 function pedidosGraficos(relId: number, dadosId: number) {
-  return GRAFICOS_FIXOS.map((g, i) => ({
-    addChart: {
-      chart: {
-        spec: {
-          title: g.titulo,
-          titleTextFormat: texto(NAVY, 12, true),
-          fontName: "Arial",
-          backgroundColor: WHITE,
-          pieChart: {
-            legendPosition: "RIGHT_LEGEND",
-            domain: { sourceRange: { sources: [caixa(dadosId, 1 + i * 14, 22, 9 + i * 14, 23)] } },
-            series: { sourceRange: { sources: [caixa(dadosId, 1 + i * 14, 23, 9 + i * 14, 24)] } },
+  return GRAFICOS_FIXOS.map((g, i) => {
+    const linhas = i === 0 ? 12 : 8;
+    const faixa = (col: number) => caixa(dadosId, 1 + i * 14, col, 1 + i * 14 + linhas, col + 1);
+    return {
+      addChart: {
+        chart: {
+          spec: {
+            title: g.titulo,
+            titleTextFormat: texto(NAVY, 12, true),
+            fontName: "Arial",
+            backgroundColor: WHITE,
+            pieChart: {
+              legendPosition: "RIGHT_LEGEND",
+              domain: { sourceRange: { sources: [faixa(22)] } },
+              series: { sourceRange: { sources: [faixa(23)] } },
+            },
           },
-        },
-        position: {
-          overlayPosition: {
-            anchorCell: { sheetId: relId, rowIndex: 10 + Math.floor(i / 2) * 16, columnIndex: 5 + (i % 2) * 5 },
-            offsetXPixels: 8,
-            offsetYPixels: 8,
-            widthPixels: 420,
-            heightPixels: 250,
+          position: {
+            overlayPosition: {
+              anchorCell: { sheetId: relId, rowIndex: 10 + Math.floor(i / 2) * 16, columnIndex: 5 + (i % 2) * 5 },
+              offsetXPixels: 8,
+              offsetYPixels: 8,
+              widthPixels: 420,
+              heightPixels: 250,
+            },
           },
         },
       },
-    },
-  }));
+    };
+  });
 }
 async function lerTudo(admin: ReturnType<typeof createClient>, path: string) {
   const out: Record<string, unknown>[] = [];
@@ -692,7 +747,7 @@ Deno.serve(async (req) => {
     GRAFICOS_FIXOS.forEach((g, i) => {
       const row = 1 + i * 14;
       data.push({ range: "'Dados'!W" + row, values: [[g.titulo]] });
-      data.push({ range: "'Dados'!W" + (row + 1), values: [[g.formula()]] });
+      data.push({ range: "'Dados'!W" + (row + 1), values: [[comLegenda(g.formula())]] });
     });
     if (notasVazias) {
       data.push({

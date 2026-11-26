@@ -7,6 +7,7 @@
   var API = {};
   var timers = new WeakMap();
   var mesCal = new Date();
+  var visaoDetalhe = false;
   var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
   var REMETENTE = 'Mediação Cultural Sesc <onboarding@resend.dev>';
   mesCal.setDate(1);
@@ -121,7 +122,8 @@
   }
   function slotHtml(v) {
     var atual = typeof v === 'string' ? v : '';
-    return '<label>Horário da visita no Sesc<select name=hora data-slot data-atual="' + esc(atual) + '"><option value="">Selecione…</option></select></label>';
+    var id = 'hs-' + Math.random().toString(36).slice(2, 9);
+    return '<label>Horário da visita no Sesc<input name=hora type=time step=60 data-slot data-atual="' + esc(atual) + '" value="' + esc(atual) + '" list="' + id + '"><datalist id="' + id + '"></datalist></label><p class=mut data-slothint>Sugestões da grade do dia; você também pode digitar outro horário (ex.: 15:30).</p>';
   }
   function endsHtml(v) {
     var list = Array.isArray(v) ? v.filter(Boolean) : [];
@@ -155,7 +157,7 @@
       if (atual && horas.indexOf(atual) < 0) horas.push(atual);
       var visitas = (API.visitas ? API.visitas() : []).filter(function (v) { return v.data === dia && OCUPA[v.status || 'Agendado']; });
       var dur = cfgAtual().durPadrao;
-      var html = '<option value="">Selecione…</option>' + horas.map(function (h) {
+      var html = horas.map(function (h) {
         var ocup = visitas.some(function (v) {
           if (v.id === vid) return false;
           if (v.hora === h) return true;
@@ -166,9 +168,14 @@
           if (fim == null || fim <= ini) fim = ini + dur;
           return slot >= ini && slot < fim;
         });
-        return '<option value="' + h + '"' + (h === atual ? ' selected' : '') + (ocup ? ' disabled' : '') + '>' + h + (ocup ? ' (reservado)' : '') + '</option>';
+        return '<option value="' + h + '">' + h + (ocup ? ' (reservado)' : '') + '</option>';
       }).join('');
-      if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; if (atual) sel.value = atual; }
+      var list = sel.list || (sel.getAttribute('list') ? document.getElementById(sel.getAttribute('list')) : null);
+      if (list && list.dataset.sig !== html) { list.innerHTML = html; list.dataset.sig = html; }
+      if (atual && document.activeElement !== sel && sel.value !== atual) sel.value = atual;
+      if (sel.value) sel.dataset.atual = sel.value;
+      var hint = f.querySelector('[data-slothint]');
+      if (hint) hint.hidden = !horas.length;
     }
     var on = f.elements.transporte && f.elements.transporte.value === 'Ônibus do Sesc';
     var varios = f.elements.varios && f.elements.varios.checked;
@@ -362,15 +369,74 @@
   function diaChave(y, m, d) {
     return y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
   }
+  var SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+  function fdBr(iso) {
+    var p = String(iso || '').split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : (iso || '');
+  }
+  function diaSemana(iso) {
+    var p = String(iso || '').split('-');
+    var dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return SEMANA[dt.getDay()] || '';
+  }
+  function ehOnibus(v) {
+    return String(v && v.transporte || '').trim() === 'Ônibus do Sesc';
+  }
+  function enderecoDe(v) {
+    var e = String(v && v.endereco || '').trim();
+    if (e) return e;
+    return (Array.isArray(v && v.embarques) ? v.embarques : []).map(function (x) { return x && x.endereco; }).filter(Boolean).join(' · ');
+  }
+  function pegarDe(v) {
+    var horas = (Array.isArray(v && v.embarques) ? v.embarques : []).map(function (x) { return x && x.hora; }).filter(Boolean);
+    return horas[0] || '';
+  }
+  function visitasMes() {
+    var y = mesCal.getFullYear(), m = mesCal.getMonth();
+    var prefix = diaChave(y, m, 1).slice(0, 7);
+    return (API.visitas ? API.visitas() : []).filter(function (v) {
+      return String(v.data || '').indexOf(prefix) === 0 && v.status !== 'Cancelado';
+    }).sort(function (a, b) {
+      return String(a.data || '').localeCompare(String(b.data || '')) || String(a.hora || '').localeCompare(String(b.hora || ''));
+    });
+  }
+  function gradeHtml(visitas) {
+    if (!visitas.length) return '<p class=mut>Não há visitas neste mês.</p>';
+    var porDia = {};
+    visitas.forEach(function (v) { (porDia[v.data] = porDia[v.data] || []).push(v); });
+    var mesNome = mesCal.toLocaleDateString('pt-BR', { month: 'long' });
+    var rows = '', first = true;
+    Object.keys(porDia).sort().forEach(function (dia) {
+      var lista = porDia[dia];
+      var qtd = lista.filter(ehOnibus).length;
+      lista.forEach(function (v, i) {
+        var bus = ehOnibus(v);
+        rows += '<tr' + (bus ? ' class=bus' : '') + '>';
+        if (first) { rows += '<td class=mes rowspan="' + visitas.length + '">' + esc(mesNome) + '</td>'; first = false; }
+        if (i === 0) {
+          rows += '<td class=dia rowspan="' + lista.length + '"><b>' + esc(diaSemana(dia)) + '</b><br>' + esc(fdBr(dia)) + '</td>';
+          rows += '<td class=qtd rowspan="' + lista.length + '">' + (qtd || '—') + '</td>';
+        }
+        rows += '<td>' + esc(pegarDe(v) || '—') + '</td>';
+        rows += '<td>' + esc(v.alunos != null && v.alunos !== '' ? v.alunos : '—') + '</td>';
+        rows += '<td>' + esc((v.hora || '—') + (v.fim ? '–' + v.fim : '')) + '</td>';
+        rows += '<td>' + esc(v.embSesc || '—') + '</td>';
+        rows += '<td><button type=button class=loglink data-bk="' + esc(v.id) + '">' + esc(v.escola || 'Grupo') + '</button>' + (bus ? '<span class=bustit>Com ônibus do Sesc</span>' : '') + '</td>';
+        rows += '<td>' + esc(enderecoDe(v) || '—') + '</td>';
+        rows += '<td>' + esc(v.resp || '—') + '</td>';
+        rows += '<td>' + esc(v.contato || v.tel || '—') + '</td>';
+        rows += '<td>' + esc(v.email || '—') + '</td>';
+        rows += '<td>' + esc(v.status || '') + '</td></tr>';
+      });
+    });
+    return '<div class=logscroll><table class=loggrade><thead><tr><th>Mês</th><th>Dia</th><th>Qtd ônibus</th><th>Horário de pegar</th><th>Passageiros</th><th>Visita no Sesc</th><th>Saída do Sesc</th><th>Instituição</th><th>Endereço</th><th>Contato</th><th>Telefone</th><th>E-mail</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div><p class=mut>Motorista, bairro, cidade, CEP e a distância ainda não fazem parte da ficha. A tabela mostra o que o agendamento já guarda. Clique no nome da instituição para abrir a ficha.</p>';
+  }
   function calendarioHtml() {
     var y = mesCal.getFullYear(), m = mesCal.getMonth();
     var first = (new Date(y, m, 1).getDay() + 6) % 7;
     var n = new Date(y, m + 1, 0).getDate();
-    var prefix = diaChave(y, m, 1).slice(0, 7);
     var hoje = diaChave(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-    var visitas = (API.visitas ? API.visitas() : []).filter(function (v) {
-      return String(v.data || '').indexOf(prefix) === 0 && v.status !== 'Cancelado';
-    });
+    var visitas = visitasMes();
     var sol = visitas.filter(function (v) { return v.status === 'Solicitado'; }).length;
     var marcadas = visitas.length - sol;
     var nome = mesCal.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -379,15 +445,16 @@
     for (i = 0; i < first; i++) cells += '<div class="cd off"></div>';
     for (var d = 1; d <= n; d++) {
       var k = diaChave(y, m, d);
-      var chips = visitas.filter(function (v) { return v.data === k; }).sort(function (a, b) {
-        return String(a.hora || '').localeCompare(String(b.hora || ''));
-      }).map(function (v) {
-        var pedido = v.status === 'Solicitado';
-        return '<button type=button class="logchip ' + (pedido ? 'logsol' : 'logfeito') + '" data-bk="' + esc(v.id) + '">' + esc((v.hora ? v.hora + ' ' : '') + (v.escola || 'Grupo')) + '</button>';
+      var chips = visitas.filter(function (v) { return v.data === k; }).map(function (v) {
+        var pedido = v.status === 'Solicitado', bus = ehOnibus(v);
+        return '<button type=button class="logchip ' + (pedido ? 'logsol' : 'logfeito') + (bus ? ' logbus' : '') + '" data-bk="' + esc(v.id) + '">' + (bus ? '<b>Com ônibus do Sesc</b>' : '') + esc((v.hora ? v.hora + ' ' : '') + (v.escola || 'Grupo')) + '</button>';
       }).join('');
       cells += '<div class="cd' + (k === hoje ? ' today' : '') + '" data-agd="' + k + '" title="Clique para agendar neste dia"><b>' + d + '</b>' + chips + '</div>';
     }
-    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>Clique num dia para abrir o agendamento já com essa data. Clique numa visita para abrir a ficha dela. O tracejado é um pedido em análise (já reserva o horário). A cor clara é o que já está programado: agendado, confirmado ou a conferir. Ao mudar para Confirmado, a instituição recebe o ofício por e-mail.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação' : ' solicitações') + ' · ' + marcadas + (marcadas === 1 ? ' já programada.' : ' já programadas.') + '</p><div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div></section>';
+    var corpo = visaoDetalhe
+      ? gradeHtml(visitas)
+      : '<div class=cw><div class=cg>' + ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(function (x) { return '<div class=ch0>' + x + '</div>'; }).join('') + cells + '</div></div>';
+    return '<section class="card" id=logcal><h3>Calendário das solicitações</h3><p class=d>Clique num dia para abrir o agendamento já com essa data. Clique numa visita para abrir a ficha dela. O verde é visita com ônibus do Sesc. O tracejado é um pedido em análise (já reserva o horário). A cor clara é o que já está programado. A visão detalhada lista os dados do mês, no formato da planilha de ônibus.</p><div class=calbar><button type=button class="btn g" data-logact=cal-mes data-dir=-1>Mês anterior</button><b>' + esc(nome) + '</b><button type=button class="btn g" data-logact=cal-mes data-dir=1>Próximo mês</button><button type=button class="btn g" data-logact=cal-visao>' + (visaoDetalhe ? 'Voltar ao calendário' : 'Visão detalhada') + '</button></div><p class=mut>' + sol + (sol === 1 ? ' solicitação' : ' solicitações') + ' · ' + marcadas + (marcadas === 1 ? ' já programada.' : ' já programadas.') + '</p>' + corpo + '</section>';
   }
   function pintarCal() {
     var box = document.getElementById('logcal');
@@ -395,7 +462,7 @@
     box.outerHTML = calendarioHtml();
   }
   function textoPrivacidade() {
-    return '<h3>Política de privacidade — LGPD</h3><p>A mediação cultural do Sesc Piracicaba usa os dados deste formulário para analisar e agendar a visita do grupo. O envio reserva o horário escolhido enquanto a supervisão analisa o pedido.</p><p>Coletamos o nome da escola ou do grupo, o tipo de instituição, a faixa etária, o número de pessoas, o nome do responsável, o telefone, o e-mail, observações de acessibilidade e, quando o grupo pede o ônibus do Sesc, os endereços de embarque.</p><p>A supervisão e a equipe de mediação que entra no sistema veem esses dados. O formulário público não mostra os pedidos das outras instituições. O e-mail serve para avisar que a solicitação chegou, para enviar a confirmação com o ofício e para a instituição devolver o documento assinado.</p><p>O registro fica guardado enquanto a visita fizer parte da agenda. A instituição pode pedir correção ou exclusão à supervisão da mediação cultural.</p><p>O envio só segue depois que o responsável marca que leu esta política e autoriza o uso dos dados para essa finalidade.</p>';
+    return '<h3>Política de privacidade — LGPD</h3><p>A mediação cultural do Sesc Piracicaba usa os dados deste formulário para analisar e agendar a visita do grupo. O envio reserva o horário escolhido enquanto a supervisão analisa o pedido.</p><p>Coletamos o nome da escola ou do grupo, o tipo de instituição, a faixa etária, o número de pessoas, o nome do responsável, o telefone, o e-mail, observações de acessibilidade e, quando o grupo pede o ônibus do Sesc, os endereços de embarque.</p><p>A supervisão e a equipe de mediação que entra no sistema veem esses dados. O formulário público não mostra os pedidos das outras instituições. O e-mail serve para avisar que a solicitação chegou.</p><p>O registro fica guardado enquanto a visita fizer parte da agenda. A instituição pode pedir correção ou exclusão à supervisão da mediação cultural.</p><p>O envio só segue depois que o responsável marca que leu esta política e autoriza o uso dos dados para essa finalidade.</p>';
   }
   function abrirPrivacidade() {
     var box = document.getElementById('lgpd-box');
@@ -420,7 +487,7 @@
     var c = cfgAtual();
     var url = location.origin + location.pathname + '?visita=1';
     queueMicrotask(carregarAviso);
-    return calendarioHtml() + '<section class="card" id=logcard><h3>Ônibus e horários de visita</h3><p class=d>A lista vale em todos os dias. A grade de uma data, quando existir, substitui a lista só naquele dia. O link público só oferece horários livres (já solicitados ou confirmados ficam fora). Ao confirmar uma visita, o ofício sai para o e-mail da instituição; o e-mail abaixo é o destino da devolução do documento assinado. O link público não mostra equipe, status nem pós-visita.</p><p><a href="' + esc(url) + '" target=_blank rel=noopener>' + esc(url) + '</a></p><p><button type=button class="btn g" data-logact=copiar>Copiar link do formulário</button></p><form id=logcfg><label>Endereço do Sesc<input name=enderecoSesc value="' + esc(c.enderecoSesc) + '" placeholder="Rua, número, bairro, Piracicaba"></label><label>Horários da visita (um por linha)<textarea name=horarios rows=4>' + esc(c.horarios.join('\n')) + '</textarea></label><label>Duração padrão da mediação (min)<input name=durPadrao type=number min=20 max=240 value="' + c.durPadrao + '"></label><label>Duração mínima (min)<input name=durMin type=number min=15 max=240 value="' + c.durMin + '"></label><label>Margem por trecho (min)<input name=margem type=number min=0 max=60 value="' + c.margem + '"></label><label>Lotação do ônibus<input name=lotacao type=number min=1 max=80 value="' + c.lotacao + '"></label><button class=btn>Salvar lista geral</button></form><details><summary>Ativar o mapa (só na primeira vez)</summary><p class=d>A conta do trajeto usa o Google, com Geocoding API e Distance Matrix API. A chave fica guardada no banco e o site não mostra de novo. Sem a chave, a instituição envia a solicitação e a supervisão completa o embarque.</p><p><a href="https://console.cloud.google.com/google/maps-apis/start" target=_blank rel=noopener>Abrir as APIs de mapa do Google</a></p><form id=logkey><label>Chave<input name=chave type=password autocomplete=off placeholder="Cole a chave aqui"></label><button class="btn g" type=submit>Salvar chave do mapa</button></form></details><details open><summary>E-mail das solicitações</summary><p class=d>Cole a chave do Resend. O remetente de teste, onboarding@resend.dev, só entrega no e-mail da conta que criou a chave. Para a escola receber o aviso e o ofício de confirmação, verifique um domínio no Resend e troque o remetente. O e-mail abaixo recebe as solicitações e é o endereço informado no ofício para a instituição devolver o documento assinado. A chave fica guardada no banco e o site não mostra de novo.</p><form id=logmail><label>Chave do Resend<input name=chave type=password autocomplete=off placeholder="Cole a chave aqui"></label><label>E-mail que recebe as solicitações e a devolução do ofício assinado<input name=email type=email placeholder="supervisao@..."></label><label>Remetente<input name=de value="' + esc(REMETENTE) + '"></label><button class=btn type=submit>Salvar envio de e-mail</button></form></details><h3 style="margin-top:16px">Grade de um dia</h3><p class=d>Muda os horários de mediação só na data escolhida. Uma visita já reservada não muda sozinha: use Mover para recalcular o embarque e a volta dela.</p><form id=logdia><label>Data<input name=data type=date></label><label>Horários deste dia (um por linha)<textarea name=horarios rows=4></textarea></label><button class=btn>Salvar este dia</button> <button type=button class="btn g" data-logact=limpar-dia>Usar a lista geral neste dia</button></form><div id=logvisitas></div></section>';
+    return calendarioHtml() + '<section class="card" id=logcard><h3>Ônibus e horários de visita</h3><p class=d>A lista vale em todos os dias. A grade de uma data, quando existir, substitui a lista só naquele dia. O link público só oferece horários livres (já solicitados ou confirmados ficam fora). O link público não mostra equipe, status nem pós-visita.</p><p><a href="' + esc(url) + '" target=_blank rel=noopener>' + esc(url) + '</a></p><p><button type=button class="btn g" data-logact=copiar>Copiar link do formulário</button></p><form id=logcfg><label>Endereço do Sesc<input name=enderecoSesc value="' + esc(c.enderecoSesc) + '" placeholder="Rua, número, bairro, Piracicaba"></label><label>Horários da visita (um por linha)<textarea name=horarios rows=4>' + esc(c.horarios.join('\n')) + '</textarea></label><label>Duração padrão da mediação (min)<input name=durPadrao type=number min=20 max=240 value="' + c.durPadrao + '"></label><label>Duração mínima (min)<input name=durMin type=number min=15 max=240 value="' + c.durMin + '"></label><label>Margem por trecho (min)<input name=margem type=number min=0 max=60 value="' + c.margem + '"></label><label>Lotação do ônibus<input name=lotacao type=number min=1 max=80 value="' + c.lotacao + '"></label><button class=btn>Salvar lista geral</button></form><details><summary>Ativar o mapa (só na primeira vez)</summary><p class=d>A conta do trajeto usa o Google, com Geocoding API e Distance Matrix API. A chave fica guardada no banco e o site não mostra de novo. Sem a chave, a instituição envia a solicitação e a supervisão completa o embarque.</p><p><a href="https://console.cloud.google.com/google/maps-apis/start" target=_blank rel=noopener>Abrir as APIs de mapa do Google</a></p><form id=logkey><label>Chave<input name=chave type=password autocomplete=off placeholder="Cole a chave aqui"></label><button class="btn g" type=submit>Salvar chave do mapa</button></form></details><details open><summary>E-mail das solicitações</summary><p class=d>Cole a chave do Resend. O remetente de teste, onboarding@resend.dev, só entrega no e-mail da conta que criou a chave. Para a escola receber o aviso da solicitação, verifique um domínio no Resend e troque o remetente. O e-mail abaixo recebe as solicitações. A chave fica guardada no banco e o site não mostra de novo.</p><form id=logmail><label>Chave do Resend<input name=chave type=password autocomplete=off placeholder="Cole a chave aqui"></label><label>E-mail que recebe as solicitações<input name=email type=email placeholder="supervisao@..."></label><label>Remetente<input name=de value="' + esc(REMETENTE) + '"></label><button class=btn type=submit>Salvar envio de e-mail</button></form></details><h3 style="margin-top:16px">Grade de um dia</h3><p class=d>Muda os horários de mediação só na data escolhida. Uma visita já reservada não muda sozinha: use Mover para recalcular o embarque e a volta dela.</p><form id=logdia><label>Data<input name=data type=date></label><label>Horários deste dia (um por linha)<textarea name=horarios rows=4></textarea></label><button class=btn>Salvar este dia</button> <button type=button class="btn g" data-logact=limpar-dia>Usar a lista geral neste dia</button></form><div id=logvisitas></div></section>';
   }
   function cfgBody(extra) {
     var c = cfgAtual();
@@ -457,14 +524,16 @@
     var op = horas.slice();
     box.innerHTML = lista.map(function (v) {
       var opts = op.indexOf(v.hora) < 0 ? [v.hora].concat(op) : op.slice();
-      return '<div class=it><div><b>' + esc(v.escola || 'Grupo') + '</b> <span class=tag>' + esc(v.status || '') + '</span><div class=mut>' + esc(v.transporte || '') + (v.logisticaManual ? ' · horário ajustado à mão' : '') + '</div></div><label>Início da mediação<select data-movsel="' + esc(v.id) + '">' + opts.map(function (h) { return '<option' + (h === v.hora ? ' selected' : '') + '>' + esc(h) + '</option>'; }).join('') + '</select></label><button type=button class="btn g" data-logact=mover data-id="' + esc(v.id) + '">Mover</button></div>';
+      var lid = 'mv-' + String(v.id || '').replace(/[^a-zA-Z0-9_-]/g, '') + '-' + Math.random().toString(36).slice(2, 6);
+      return '<div class=it><div><b>' + esc(v.escola || 'Grupo') + '</b> <span class=tag>' + esc(v.status || '') + '</span><div class=mut>' + esc(v.transporte || '') + (v.logisticaManual ? ' · horário ajustado à mão' : '') + '</div></div><label>Início da mediação<input type=time step=60 data-movsel="' + esc(v.id) + '" value="' + esc(v.hora || '') + '" list="' + lid + '"><datalist id="' + lid + '">' + opts.map(function (h) { return '<option value="' + esc(h) + '">'; }).join('') + '</datalist></label><button type=button class="btn g" data-logact=mover data-id="' + esc(v.id) + '">Mover</button></div>';
     }).join('');
   }
   async function mover(id) {
     var sel = document.querySelector('[data-movsel="' + CSS.escape(id) + '"]');
-    var hora = sel ? sel.value : '';
+    var hora = sel ? String(sel.value || '').trim() : '';
     var v = (API.visitas ? API.visitas() : []).find(function (x) { return x.id === id; });
-    if (!v || !horaOk(hora)) return;
+    if (!v) return;
+    if (!horaOk(hora)) return avisar('Informe o horário no formato 15:30.');
     if (hora === v.hora) return avisar('Esse já é o horário da visita.');
     if (v.logisticaManual && API.ask) {
       var ok = await API.ask('Esta visita está com embarque ajustado à mão. Mover o horário recalcula e substitui esse ajuste.');
@@ -502,7 +571,7 @@
   }
 
   function publico() {
-    return '<section class="card vpub"><h2>Pedir uma visita</h2><p class=d>Mediação cultural · Sesc Piracicaba. Escolha uma data e um horário ainda disponíveis. Se o grupo vier no ônibus do Sesc, informe o endereço de embarque: o mapa e os horários de origem e destino aparecem para você conferir. A supervisão analisa o pedido e, ao confirmar, envia o ofício por e-mail.</p><form id=vpub novalidate><label>Escola ou grupo<input name=escola required autocomplete=organization></label><label>Data<input name=data type=date required></label><label>Horário da visita no Sesc<select name=hora required><option value="">Escolha a data primeiro</option></select></label><label>Nº de pessoas<input name=alunos type=number min=1 max=500></label><label>Tipo de instituição<select name=tipo>' + TIPOS.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select></label><label>Faixa etária / ano ou série<input name=serie></label><label>Responsável pelo grupo<input name=resp autocomplete=name></label><label>Telefone<input name=contato type=tel autocomplete=tel required></label><label>E-mail<input name=email type=email autocomplete=email required></label><label>Pessoas com deficiência (quantas e qual)<input name=pcd></label><label>Transporte<select name=transporte><option>Transporte próprio</option><option>Ônibus do Sesc</option></select></label><div class=medw data-tr data-ends hidden><label class=chk><input type=checkbox name=varios> Embarque em mais de um endereço, antes de ir ao Sesc</label><div data-endlist>' + rowEnd('') + '</div><p data-maiswrap hidden><button type=button class="btn g" data-logact=mais-end>Incluir outro endereço</button></p><p class=mut data-maiswrap hidden>A conta soma uma margem em cada trecho, para imprevisto.</p>' + mapHtml() + '</div><div class=medw data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>Ao pedir o ônibus, informe o endereço. O embarque na origem e no destino aparecem aqui.</div></div><label>Observações da visita<textarea name=obs rows=3 placeholder="Acessibilidade, interesses, temas"></textarea></label><div class=vfoot><label class=chk><input type=checkbox name=lgpd> Li a política de privacidade e autorizo o uso desses dados para analisar e agendar a visita.</label><button type=button class="btn g" data-logact=privacidade>Política de privacidade — LGPD</button><button class=btn type=submit>Enviar solicitação</button></div></form></section>';
+    return '<section class="card vpub"><h2>Pedir uma visita</h2><p class=d>Mediação cultural · Sesc Piracicaba. Escolha uma data e um horário ainda disponíveis. Se o grupo vier no ônibus do Sesc, informe o endereço de embarque: o mapa e os horários de origem e destino aparecem para você conferir. A supervisão analisa o pedido e confirma a visita.</p><form id=vpub novalidate><label>Escola ou grupo<input name=escola required autocomplete=organization></label><label>Data<input name=data type=date required></label><label>Horário da visita no Sesc<select name=hora required><option value="">Escolha a data primeiro</option></select></label><label>Nº de pessoas<input name=alunos type=number min=1 max=500></label><label>Tipo de instituição<select name=tipo>' + TIPOS.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select></label><label>Faixa etária / ano ou série<input name=serie></label><label>Responsável pelo grupo<input name=resp autocomplete=name></label><label>Telefone<input name=contato type=tel autocomplete=tel required></label><label>E-mail<input name=email type=email autocomplete=email required></label><label>Pessoas com deficiência (quantas e qual)<input name=pcd></label><label>Transporte<select name=transporte><option>Transporte próprio</option><option>Ônibus do Sesc</option></select></label><div class=medw data-tr data-ends hidden><label class=chk><input type=checkbox name=varios> Embarque em mais de um endereço, antes de ir ao Sesc</label><div data-endlist>' + rowEnd('') + '</div><p data-maiswrap hidden><button type=button class="btn g" data-logact=mais-end>Incluir outro endereço</button></p><p class=mut data-maiswrap hidden>A conta soma uma margem em cada trecho, para imprevisto.</p>' + mapHtml() + '</div><div class=medw data-tr hidden data-logres><b class=mlb>Horários do ônibus</b><div class=mut data-logmsg>Ao pedir o ônibus, informe o endereço. O embarque na origem e no destino aparecem aqui.</div></div><label>Observações da visita<textarea name=obs rows=3 placeholder="Acessibilidade, interesses, temas"></textarea></label><div class=vfoot><label class=chk><input type=checkbox name=lgpd> Li a política de privacidade e autorizo o uso desses dados para analisar e agendar a visita.</label><button type=button class="btn g" data-logact=privacidade>Política de privacidade — LGPD</button><button class=btn type=submit>Enviar solicitação</button></div></form></section>';
   }
   function bootPublico() {
     var hold = document.getElementById('visita-pub');
@@ -559,7 +628,7 @@
     var mail = r && r.emailAviso
       ? '<p>' + esc(r.emailAviso) + '</p>'
       : '<p>Sua solicitação reservou o horário e será analisada. Em breve você recebe informações se está confirmada.</p>';
-    hold.innerHTML = '<section class="card vpub"><h2>Solicitação enviada</h2><p>A supervisão da mediação cultural analisa o pedido. Em breve você recebe informações se a visita está confirmada. Quando confirmada, o ofício para assinatura chega por e-mail.</p>' + mail + extra + '<p><button type=button class=btn data-logact=outra>Enviar outra solicitação</button></p></section>';
+    hold.innerHTML = '<section class="card vpub"><h2>Solicitação enviada</h2><p>A supervisão da mediação cultural analisa o pedido. Em breve você recebe informações se a visita está confirmada. Quando confirmada, a supervisão entra em contato.</p>' + mail + extra + '<p><button type=button class=btn data-logact=outra>Enviar outra solicitação</button></p></section>';
   }
   async function enviarPublico(f) {
     var d = coletarPublico(f);
@@ -610,6 +679,11 @@
     if (!f) return;
     if (f.id === 'logcfg' || f.id === 'logmail') f.dataset.user = '1';
     if (e.target.name === 'fim' && !e.target.readOnly) e.target.dataset.user = '1';
+    if (e.target.name === 'hora' && e.target.dataset && e.target.dataset.slot != null) {
+      e.target.dataset.atual = e.target.value || '';
+      sugerirFimProprio(f);
+      prever(f);
+    }
     if (e.target.name === 'end') {
       clearTimeout(atualizarMapa._t);
       atualizarMapa._t = setTimeout(function () { atualizarMapa(f); }, 400);
@@ -727,6 +801,12 @@
       pintarCal();
       return;
     }
+    if (act === 'cal-visao') {
+      e.preventDefault();
+      visaoDetalhe = !visaoDetalhe;
+      pintarCal();
+      return;
+    }
     if (act === 'privacidade') { e.preventDefault(); abrirPrivacidade(); return; }
     if (act === 'fechar-privacidade') {
       e.preventDefault();
@@ -749,7 +829,7 @@
   if (!document.getElementById('log-css')) {
     var s = document.createElement('style');
     s.id = 'log-css';
-    s.textContent = '.medw input[type=time][readonly]{background:#f4f1e8}.vpub{max-width:760px;margin:0 auto}#vpub .vfoot{grid-column:1/-1;display:grid;grid-template-columns:auto auto;grid-template-areas:"consent consent" "privacy submit";justify-content:space-between;align-items:center;gap:12px 16px;margin-top:2px;padding-top:12px;border-top:1.5px solid #ead9a4}#vpub .vfoot .chk{grid-area:consent;align-items:flex-start;gap:10px;margin:0;font-size:14.5px;font-weight:700;line-height:1.4}#vpub .vfoot .chk input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;flex:none;accent-color:#2d2e5f}#vpub .vfoot .btn{align-self:center;width:auto;margin:0;white-space:nowrap}#vpub .vfoot [data-logact=privacidade]{grid-area:privacy;justify-self:start}#vpub .vfoot [type=submit]{grid-area:submit;justify-self:end}@media(max-width:700px){#vpub .vfoot{grid-template-columns:1fr;grid-template-areas:"consent" "privacy" "submit"}#vpub .vfoot .btn{width:100%;white-space:normal;justify-self:stretch}}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}.logmap{margin-top:8px;border:1.5px solid #d4d4e0;border-radius:10px;overflow:hidden;background:#eef0f6}.logmap iframe{display:block;width:100%;height:220px;border:0}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .logchip{display:block;width:100%;margin-top:2px;padding:1px 4px;border-radius:4px;font:700 11px Nunito,sans-serif;line-height:1.2;text-align:left;white-space:normal;cursor:pointer}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}#logcal .logfeito{background:#f6e4e4;color:#7a3030;border:1.5px solid #e4c4c4}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
+    s.textContent = '.medw input[type=time][readonly]{background:#f4f1e8}.vpub{max-width:760px;margin:0 auto}#vpub .vfoot{grid-column:1/-1;display:grid;grid-template-columns:auto auto;grid-template-areas:"consent consent" "privacy submit";justify-content:space-between;align-items:center;gap:12px 16px;margin-top:2px;padding-top:12px;border-top:1.5px solid #ead9a4}#vpub .vfoot .chk{grid-area:consent;align-items:flex-start;gap:10px;margin:0;font-size:14.5px;font-weight:700;line-height:1.4}#vpub .vfoot .chk input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;flex:none;accent-color:#2d2e5f}#vpub .vfoot .btn{align-self:center;width:auto;margin:0;white-space:nowrap}#vpub .vfoot [data-logact=privacidade]{grid-area:privacy;justify-self:start}#vpub .vfoot [type=submit]{grid-area:submit;justify-self:end}@media(max-width:700px){#vpub .vfoot{grid-template-columns:1fr;grid-template-areas:"consent" "privacy" "submit"}#vpub .vfoot .btn{width:100%;white-space:normal;justify-self:stretch}}.vpub h2{font-family:Bevan,Georgia,serif;font-weight:400;color:#2d2e5f;font-size:1.6rem}[data-logmsg]{white-space:pre-wrap}.endrow{display:flex;gap:8px;align-items:end}.endrow label{flex:1}.endrow .btn{flex:none}.logmap{margin-top:8px;border:1.5px solid #d4d4e0;border-radius:10px;overflow:hidden;background:#eef0f6}.logmap iframe{display:block;width:100%;height:220px;border:0}#logvisitas .it{align-items:end}#logcal .cg{min-width:0}#logcal .logchip{display:block;width:100%;margin-top:2px;padding:1px 4px;border-radius:4px;font:700 11px Nunito,sans-serif;line-height:1.2;text-align:left;white-space:normal;cursor:pointer}#logcal .logsol{background:#fff;color:#8a5a00;border:1.5px dashed #c48a12}#logcal .logfeito{background:#f6e4e4;color:#7a3030;border:1.5px solid #e4c4c4}#logcal .logchip.logbus{background:#d7f3ea;color:#0c6b5a;border:1.5px solid #9ed9c8;display:flex;flex-direction:column;align-items:flex-start;gap:1px;white-space:normal;text-align:left}#logcal .logchip.logbus.logsol{border-style:dashed}#logcal .logchip b{font-size:9px;letter-spacing:.02em;text-transform:uppercase}#logcal .logscroll{overflow:auto;max-width:100%}#logcal .loggrade{border-collapse:collapse;min-width:1100px;font-size:12.5px}#logcal .loggrade th{position:sticky;top:0;background:#2d2e5f;color:#fff;font-weight:700;text-align:left;padding:6px 8px;white-space:nowrap}#logcal .loggrade td{border:1px solid #ead9a4;padding:6px 8px;vertical-align:top;background:#fff}#logcal .loggrade td.mes{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:800;text-align:center;background:#f6e4e4;letter-spacing:.04em}#logcal .loggrade tr.bus td{background:#e5f6f0}#logcal .loggrade td.qtd{text-align:center;font-weight:800}#logcal .loglink{background:none;border:0;padding:0;color:#2d2e5f;font-weight:800;text-decoration:underline;cursor:pointer;font:inherit;text-align:left}#logcal .bustit{display:block;font-size:10px;font-weight:800;color:#0c6b5a;margin-top:2px}#logcal .loggrade tr.bus td.mes{background:#f6e4e4;color:#2d2e5f}html.sovis nav,html.sovis #wa,html.sovis #authbtn,html.sovis .vsel{display:none!important}html.sovis [data-hhome]{cursor:default}';
     document.head.appendChild(s);
   }
 

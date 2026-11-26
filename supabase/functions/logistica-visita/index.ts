@@ -124,6 +124,14 @@ function texto(v: unknown, max: number) {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 const REMETENTE = "Mediação Cultural Sesc <onboarding@resend.dev>";
 
+/**
+ * Envio automático do ofício ao confirmar a visita.
+ * Pausado: confirmar só grava o status. O PDF, o texto e a chave do Resend continuam neste arquivo.
+ * Para retomar, troque para true e publique a função.
+ */
+const OFICIO_ATIVO = false;
+const SITE_PUBLICO = "https://mediacaosesc.sherocha.com.br";
+
 function emailOk(s: string) {
   return EMAIL.test(s) && s.length <= 120;
 }
@@ -131,6 +139,24 @@ function emailOk(s: string) {
 function html(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] || c));
 }
+
+
+/** Link que abre a ficha no painel. Usa o endereço de quem enviou; se faltar, o site publicado. */
+function linkFicha(req: Request, id: string) {
+  let origin = SITE_PUBLICO;
+  let path = "/";
+  const ref = req.headers.get("referer") || "";
+  const ori = req.headers.get("origin") || "";
+  try {
+    const u = new URL(ref || ori || SITE_PUBLICO);
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      origin = u.origin;
+      path = ref && /\.html$/i.test(u.pathname) ? u.pathname : "/";
+    }
+  } catch { /* fica o site publicado */ }
+  return origin + path + "?ficha=" + encodeURIComponent(id) + "#agendamentos";
+}
+
 
 function lgpdOk(v: unknown) {
   return v === true || v === "true" || v === "sim" || v === "1";
@@ -738,6 +764,23 @@ Deno.serve(async (req) => {
     const { data: row } = await admin.from("docs").select("id,data").eq("path", "agendamentos").eq("id", id).maybeSingle();
     if (!row) return json({ error: "Visita não encontrada." }, 404);
     const ficha = { ...((row.data || {}) as Record<string, unknown>) };
+    // Ofício automático pausado. O envio completo continua neste arquivo, atrás de OFICIO_ATIVO.
+    if (!OFICIO_ATIVO) {
+      if (ficha.status !== "Confirmado") {
+        const { error: upErr } = await admin.from("docs").update({
+          data: { ...ficha, status: "Confirmado" },
+        }).eq("path", "agendamentos").eq("id", id);
+        if (upErr) return json({ error: "Não foi possível confirmar a visita." }, 500);
+      }
+      return json({
+        ok: true,
+        id,
+        status: "Confirmado",
+        emailEnviado: false,
+        oficioPausado: true,
+        emailAviso: "Visita confirmada.",
+      });
+    }
     const emailInst = texto(ficha.email, 120).toLowerCase();
     if (!emailOk(emailInst)) return json({ error: "A visita não tem e-mail da instituição para enviar o ofício." }, 400);
     if (ficha.oficioEnviado === true && body.forcar !== true && body.forcar !== "true") {
@@ -894,7 +937,7 @@ Deno.serve(async (req) => {
       "Recebemos sua solicitação de agendamento — Sesc Piracicaba",
       "<p>Recebemos a solicitação de agendamento de <b>" + html(escola) + "</b> para " + html(quando) + ".</p>" +
         trechosBus +
-        "<p>Sua solicitação <b>reservou o horário</b> e será analisada pela supervisão da mediação cultural. Em breve você recebe informações se a visita está confirmada. Quando confirmada, o ofício para assinatura chega por e-mail.</p>",
+        "<p>Sua solicitação <b>reservou o horário</b> e será analisada pela supervisão da mediação cultural. Em breve você recebe informações se a visita está confirmada.</p>",
     );
     emailEnviado = !falha;
     emailAviso = falha
@@ -906,7 +949,7 @@ Deno.serve(async (req) => {
         de,
         inbox,
         "Nova solicitação de agendamento — " + escola,
-        "<p>Chegou uma solicitação com status <b>Solicitado</b>. O horário já está reservado. Confira os dados e, se estiver tudo certo, mude o status para <b>Confirmado</b> para enviar o ofício à instituição.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p>",
+        "<p>Chegou uma solicitação com status <b>Solicitado</b>. O horário já está reservado. Confira os dados e, se estiver tudo certo, mude o status para <b>Confirmado</b>.</p><p><b>" + html(escola) + "</b><br>" + html(quando) + "<br>" + html(texto(body.contato, 40)) + "<br>" + html(email) + "<br>" + html(transporte) + "</p><p><a href=\"" + html(linkFicha(req, id)) + "\">Abrir a ficha desta solicitação</a></p>",
       );
     }
   } else {
