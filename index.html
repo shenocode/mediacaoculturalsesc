@@ -751,11 +751,47 @@ function relNarrativaOcorrencias(groups){
  return tx+' Os tópicos abaixo reúnem cada registro, para quem quiser consultar o detalhe.';
 }
 function relPct(n,t){if(!t)return '0%';const p=Math.round(n/t*1000)/10;return String(p).replace('.',',')+'%'}
-function relFatias(list,keyOf,peso){
+function relIdadeTxt(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9+ ]/g,' ').replace(/\s+/g,' ').trim()}
+function relFaixaEtaria(raw){
+ const n=relIdadeTxt(raw);
+ if(!n||/nao inform|sem inform|nao consta/.test(n))return 'Não informado';
+ if(/\bidos/.test(n)||/60\s*\+|acima de 60|mais de 60|a partir de 60/.test(n))return '60 anos ou mais';
+ if(/30\s*\+|acima de 30|mais de 30|a partir de 30/.test(n))return 'Adultos';
+ if(/\b(adultos?|docentes?|professores?)\b/.test(n)&&!/\d/.test(n))return 'Adultos';
+ const nums=[...n.matchAll(/\d+/g)].map(m=>+m[0]).filter(x=>x>=0&&x<=120);
+ if(!nums.length){
+  if(/\badult|docente|professor/.test(n))return 'Adultos';
+  if(/\bjovem/.test(n))return '14 a 24 anos';
+  if(/infantil|crianc/.test(n))return '4 a 6 anos';
+  return 'Variados';
+ }
+ const lo=Math.min(...nums),hi=Math.max(...nums);
+ if((lo<18&&hi>=30)||hi-lo>=25)return 'Variados';
+ if(lo<=17&&hi>=18&&hi<30)return hi<=18&&lo>=15?'15 a 17 anos':'14 a 24 anos';
+ if(lo>=60)return '60 anos ou mais';
+ if(lo>=30&&hi<60)return 'Adultos';
+ if(lo>=30)return 'Variados';
+ if(hi<=3)return 'Até 3 anos';
+ const bands=[[4,6,'4 a 6 anos'],[7,11,'6 a 11 anos'],[12,14,'11 a 14 anos'],[15,17,'15 a 17 anos'],[18,29,'18 a 29 anos'],[30,59,'Adultos'],[60,120,'60 anos ou mais']];
+ const score=bands.map(()=>0);
+ for(let a=lo;a<=hi;a++){const i=bands.findIndex(([b,c])=>a>=b&&a<=c);if(i>=0)score[i]++}
+ let best=0;score.forEach((v,i)=>{if(v>score[best])best=i});
+ if(!score[best])return 'Variados';
+ let second=-1;score.forEach((v,i)=>{if(i!==best&&(second<0||v>score[second]))second=i});
+ if(second>=0&&score[second]===score[best]){
+  const i1=Math.min(best,second),i2=Math.max(best,second);
+  if(bands[i2][0]-bands[i1][1]<=1&&bands[i2][1]<=17)return lo+' a '+hi+' anos';
+  return 'Variados';
+ }
+ if(score[best]*2<hi-lo+1)return 'Variados';
+ return bands[best][2];
+}
+function relFatias(list,keyOf,peso,max){
  const m=new Map();
  list.forEach(x=>{const w=+peso(x)||0;if(w<=0)return;const k=String(keyOf(x)||'').trim()||'Não informado';m.set(k,(m.get(k)||0)+w)});
  let rows=[...m.entries()].sort((a,b)=>b[1]-a[1]||String(a[0]).localeCompare(String(b[0]),'pt'));
- if(rows.length>8){const resto=rows.slice(7).reduce((s,x)=>s+x[1],0);rows=rows.slice(0,7);if(resto)rows.push(['Outras',resto])}
+ const lim=max||8;
+ if(rows.length>lim){const resto=rows.slice(lim-1).reduce((s,x)=>s+x[1],0);rows=rows.slice(0,lim-1);if(resto)rows.push(['Outras',resto])}
  return rows.map(([label,n])=>({label,n}));
 }
 function relChartOk(slices){return slices.length>0&&!(slices.length===1&&/^n[aã]o informado$/i.test(slices[0].label))}
@@ -763,7 +799,7 @@ function relCharts(ag,re,cancel,ofi){
  const charts=[],base=re.length?re:ag,quem=re.length?'pessoas atendidas':'pessoas previstas';
  const add=(id,title,unit,slices)=>{if(relChartOk(slices))charts.push({id,title,unit,slices})};
  const pessoas=x=>+x.alunos||0;
- add('faixa','Faixa etária ('+quem+')','pessoas',relFatias(base,x=>x.serie,pessoas));
+ add('faixa','Faixa etária ('+quem+')','pessoas',relFatias(base,x=>relFaixaEtaria(x.serie),pessoas,12));
  add('instituicao','Tipo de instituição ('+quem+')','pessoas',relFatias(base,x=>x.tipo,pessoas));
  add('situacao','Situação dos grupos','grupos',relFatias(ag.concat(cancel),x=>x.status||'Agendado',()=>1));
  const DIAS=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
@@ -1385,7 +1421,7 @@ const ofRepete=x=>{const r=String(x&&x.repetir||'').trim();return /^Sim\b/i.test
 function diasParse(v){if(Array.isArray(v))return [...new Set(v.map(x=>String(x||'').slice(0,10)).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)))].sort();if(v==null)return[];const s=String(v).trim();if(!s)return[];try{const j=JSON.parse(s);if(Array.isArray(j))return diasParse(j)}catch(e){}return [...new Set(s.split(/[\s,;]+/).map(x=>x.trim().slice(0,10)).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)))].sort()}
 function ofDiasBase(i){const a=diasParse(i&&i.dias);if(a.length)return a;const one=String((i&&i.data)||(i&&i.dt)||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(one)?[one]:[]}
 function ofEquipe(x){const m=medsOf(x);return m.length?m:(x&&x.autor?[x.autor]:[])}
-function ofNaCal(i){if(!i||papelOf(i)=='cotidiana')return false;if(ofLabel(i)=='Arquivada')return false;return ofDiasBase(i).length>0}
+function ofNaCal(i){if(!i||papelOf(i)=='cotidiana'||papelOf(i)=='participar')return false;if(ofLabel(i)=='Arquivada')return false;return ofDiasBase(i).length>0}
 function ofNoDia(i,k){if(!k||!ofNaCal(i))return false;const base=ofDiasBase(i);if(base.includes(k))return true;if(!ofRepete(i)||!base.length)return false;if(k<base[0])return false;const wd=new Date(k+'T12:00').getDay();return base.some(d=>k>=d&&new Date(d+'T12:00').getDay()===wd)}
 function ofCalHit(x,day){return ofNoDia(x,day)&&(!CP||ofEquipe(x).some(m=>nm(m)==nm(CP)))}
 const ofQuando=x=>{const base=ofDiasBase(x),h=ofR(x),parts=[];if(ofRepete(x)&&base.length){const wds=[...new Set(base.map(d=>(new Date(d+'T12:00').getDay()+6)%7))].sort((a,b)=>a-b);parts.push(wds.map(w=>OF_REP[w]).join(' e ')+' a partir de '+fd(base[0]))}else if(base.length>1)parts.push(base.map(fd).join(', '));else if(base.length===1)parts.push(fd(base[0]));else if(ofRepete(x))parts.push('Repetir semanalmente');if(h)parts.push(h);return parts.join(' · ')};
@@ -1691,7 +1727,7 @@ function ofPodeVer(i){if(!i)return false;if(papelOf(i)=='cotidiana')return true;
 function ofMatch(i,fs){return !fs||ofLabel(i)==fs}
 function ofStOpts(part,cur){const full=['Rascunho','Para análise','Aprovada','Em piloto','Arquivada'];let opts=ofSup()?full.slice():(part?['Rascunho','Para análise','Aprovada']:['Rascunho','Para análise']);const s=cur=='Em análise'?'Para análise':(cur||'');if(s&&!opts.includes(s))opts=[s,...opts];return opts}
 function ofStatusSave(part,raw){const s=raw=='Em análise'?'Para análise':String(raw||'').trim();const known=['Rascunho','Para análise','Aprovada','Em piloto','Arquivada','Nova'];const allowed=ofSup()?known.slice():part?['Rascunho','Para análise','Aprovada']:['Rascunho','Para análise'];if(allowed.includes(s))return s;if(known.includes(s))return s;return part?'Aprovada':'Rascunho'}
-function ofStatusCampo(part,cur){const opts=ofStOpts(part,cur),prefer=cur?ofLabel({status:cur,papel:part?'participar':'aplicar'}):(part?'Aprovada':'Rascunho'),v=opts.includes(prefer)?prefer:opts[0];const hint=part?'Rascunho fica com você e a supervisão. Para análise abre a ficha para toda a equipe. Com data, a oficina já entra no calendário (exceto Arquivada).':'Rascunho fica com você e a supervisão. Para análise abre a ficha para toda a equipe. Com datas preenchidas, a oficina já aparece no calendário (exceto Arquivada).';return `<label>Status<select name=status>${opts.map(x=>`<option ${x==v?'selected':''}>${x}</option>`).join('')}</select></label><p class=mut>${hint}</p>`}
+function ofStatusCampo(part,cur){const opts=ofStOpts(part,cur),prefer=cur?ofLabel({status:cur,papel:part?'participar':'aplicar'}):(part?'Aprovada':'Rascunho'),v=opts.includes(prefer)?prefer:opts[0];const hint=part?'Rascunho fica com você e a supervisão. Para análise abre a ficha para toda a equipe. Esta oficina fica na aba Oficinas e não entra no calendário.':'Rascunho fica com você e a supervisão. Para análise abre a ficha para toda a equipe. Com datas preenchidas, a oficina já aparece no calendário (exceto Arquivada).';return `<label>Status<select name=status>${opts.map(x=>`<option ${x==v?'selected':''}>${x}</option>`).join('')}</select></label><p class=mut>${hint}</p>`}
 let IO=null,IE=0;
 let CAPF=null;
 function capaCampo(rotulo){return `<div class=capw><b>${esc(rotulo)}</b><div class=capacts><input type=file name=capa accept="image/*" aria-label="${esc(rotulo)}"><button type=button class="btn g" data-capgal>Escolher da galeria</button></div><input type=hidden name=capagal value=""><p class=capprev hidden></p></div>`}
@@ -1714,7 +1750,7 @@ const oform=(papel,id,fields,sum,btn)=>`<details><summary>${sum}</summary><form 
 function cotOpts(cur){return '<option value="">Nenhum</option>'+gGrupos().map(g=>`<option value="${esc(g.id)}"${g.id==cur?' selected':''}>${esc(gTit(g))}</option>`).join('')}
 function cotFill(){const n=gGrupos().length,h=$('#cothint');if(h)h.textContent=n?'O link abre esse grupo na Galeria.':'Ainda não há grupos na Galeria. Crie um grupo lá para ligar as fotos.';document.querySelectorAll('select[data-cotsel]').forEach(s=>{if(document.activeElement==s)return;const cur=s.value;s.innerHTML=cotOpts(cur);if([...s.options].some(o=>o.value==cur))s.value=cur})}
 const cotForm=id=>`<label>Título da ativação<input name=titulo required></label><label>Breve descrição<textarea name=desc rows=3></textarea></label><label>Materiais utilizados<textarea name=mat rows=3></textarea></label>${capaCampo('Foto de capa')}<label>Link para fotos<select name=grupo data-cotsel>${cotOpts('')}</select></label><p class=mut id=${id=='idf-cot'?'cothint':''}></p>`;
-const IPAN=()=>{const lock=MEMBER?'':`<p class=d>🔒 <button type=button class="btn g" data-login=1>Entrar</button> para criar ou atualizar oficinas e ativações.</p>`;return `<section class=card><h3>Oficinas para aplicar</h3><p class=d>A equipe é educadora e aplica a oficina ao público. Marque as datas e quem da equipe aplica — como nos agendamentos. Com datas, a oficina já entra no calendário. Rascunho e Nova ficam com quem preencheu e com a supervisão; em Para análise, toda a equipe vê a ficha.</p>${MEMBER?oform('aplicar','idf-apl',IFA,'➕ Propor oficina para aplicar','Enviar proposta'):lock}<div id=l-apl></div></section><section class=card><h3>Ativações cotidianas</h3><p class=d>Atividades do dia a dia que complementam as mediações em grupo. A foto de capa identifica a ativação, e o link abre o grupo de fotos na Galeria. Qualquer membro pode criar e atualizar.</p>${MEMBER?`<details><summary>➕ Nova ativação cotidiana</summary><form id=idf-cot data-papel=cotidiana>${cotForm('idf-cot')}<button class=btn>Salvar ativação</button></form></details>`:lock}<div id=l-cot></div></section><section class=card><h3>Oficinas para participar</h3><p class=d>A equipe participa. Quem ministra é o educador ou a educadora da oficina. Com data, ela entra no calendário. Qualquer membro pode criar e atualizar. Em Para análise, toda a equipe vê a ficha. Rascunho fica só com você e a supervisão.</p>${MEMBER?oform('participar','idf-part',IFP,'➕ Nova oficina para participar','Salvar oficina'):lock}<div id=l-part></div></section>`};
+const IPAN=()=>{const lock=MEMBER?'':`<p class=d>🔒 <button type=button class="btn g" data-login=1>Entrar</button> para criar ou atualizar oficinas e ativações.</p>`;return `<section class=card><h3>Oficinas para aplicar</h3><p class=d>A equipe é educadora e aplica a oficina ao público. Marque as datas e quem da equipe aplica — como nos agendamentos. Com datas, a oficina já entra no calendário. Rascunho e Nova ficam com quem preencheu e com a supervisão; em Para análise, toda a equipe vê a ficha.</p>${MEMBER?oform('aplicar','idf-apl',IFA,'➕ Propor oficina para aplicar','Enviar proposta'):lock}<div id=l-apl></div></section><section class=card><h3>Ativações cotidianas</h3><p class=d>Atividades do dia a dia que complementam as mediações em grupo. A foto de capa identifica a ativação, e o link abre o grupo de fotos na Galeria. Qualquer membro pode criar e atualizar.</p>${MEMBER?`<details><summary>➕ Nova ativação cotidiana</summary><form id=idf-cot data-papel=cotidiana>${cotForm('idf-cot')}<button class=btn>Salvar ativação</button></form></details>`:lock}<div id=l-cot></div></section><section class=card><h3>Oficinas para participar</h3><p class=d>A equipe participa. Quem ministra é o educador ou a educadora da oficina. Essa lista fica na aba Oficinas e não entra no calendário. Qualquer membro pode criar e atualizar. Em Para análise, toda a equipe vê a ficha. Rascunho fica só com você e a supervisão.</p>${MEMBER?oform('participar','idf-part',IFP,'➕ Nova oficina para participar','Salvar oficina'):lock}<div id=l-part></div></section>`};
 const PROG_ATIV_HINT='Esta ativação pode ser usada como prática para complementar a mediação com os grupos agendados.';
 const PROG_SKIP=new Set(['titulo','autor','dias','data','hora','fim','med','repetir','cache','matval','transp','taxa','planej','orctot','cnpj','razao','repres','ccm','insest','endemp','cep','cpfrep','civil','fone','email','rede','portal','drt','cnae']);
 function progLists(){const all=[...(S.ideias||[])].filter(ofPodeVer);return{
